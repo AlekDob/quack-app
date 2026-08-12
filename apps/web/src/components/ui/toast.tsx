@@ -19,7 +19,11 @@ import { cn } from "~/lib/utils";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { APP_TOOLTIP_SURFACE_CLASS_NAME } from "~/components/chat/composerPickerStyles";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
-import { buildVisibleToastLayout, shouldHideCollapsedToastContent } from "./toast.logic";
+import {
+  buildVisibleToastLayout,
+  DEFAULT_TOAST_TIMEOUT_MS,
+  shouldHideCollapsedToastContent,
+} from "./toast.logic";
 import {
   COMPACT_NOTIFICATION_SURFACE_CLASS_NAME,
   EXPANDED_NOTIFICATION_SURFACE_CLASS_NAME,
@@ -481,10 +485,15 @@ function ToastSurface({
   );
 }
 
-function ToastProvider({ children, position: positionProp, ...props }: ToastProviderProps) {
+function ToastProvider({
+  children,
+  position: positionProp,
+  timeout = DEFAULT_TOAST_TIMEOUT_MS,
+  ...props
+}: ToastProviderProps) {
   const position = positionProp ?? "top-center";
   return (
-    <Toast.Provider toastManager={toastManager} {...props}>
+    <Toast.Provider timeout={timeout} toastManager={toastManager} {...props}>
       {children}
       <Toasts position={position} />
     </Toast.Provider>
@@ -655,9 +664,13 @@ function Toasts({ position: positionProp }: { position: ToastPosition }) {
   );
 }
 
-function AnchoredToastProvider({ children, ...props }: Toast.Provider.Props) {
+function AnchoredToastProvider({
+  children,
+  timeout = DEFAULT_TOAST_TIMEOUT_MS,
+  ...props
+}: Toast.Provider.Props) {
   return (
-    <Toast.Provider toastManager={anchoredToastManager} {...props}>
+    <Toast.Provider timeout={timeout} toastManager={anchoredToastManager} {...props}>
       {children}
       <AnchoredToasts />
     </Toast.Provider>

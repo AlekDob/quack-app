@@ -42,12 +42,7 @@ export function EnvironmentGitStatusSummary({
             : item.type === "pull"
               ? ArrowDownIcon
               : ArrowUpIcon;
-        const color =
-          item.type === "commit"
-            ? "text-destructive"
-            : item.type === "pull"
-              ? "text-warning"
-              : "text-success";
+        const color = "text-muted-foreground/72";
         const count =
           item.type === "commit"
             ? status.workingTree.files.length

@@ -27,12 +27,20 @@ import { ELEVATED_HOVER_SURFACE_CLASS_NAME } from "~/surfaceStyles";
 import { FolderClosed } from "../FolderClosed";
 import { SpaceIcon } from "../SpaceIcon";
 import { PickerTriggerButton } from "./PickerTriggerButton";
-import { PickerPanelShell } from "./PickerPanelShell";
+import {
+  type ActiveFolderOption,
+  basenameOfPath,
+  directorySearchHaystack,
+  getNavigatorPlatform,
+  joinDirectoryPath,
+  startActiveFolderSelection,
+} from "./ProjectPicker.logic";
 import {
   Combobox,
   ComboboxEmpty,
   ComboboxGroup,
   ComboboxGroupLabel,
+  ComboboxInput,
   ComboboxItem,
   ComboboxList,
   ComboboxPopup,
@@ -67,73 +75,12 @@ interface ProjectPickerProps {
   searchPlaceholder?: string;
 }
 
-interface ActiveFolderOption {
-  projectId: ProjectId | null;
-  spaceId: SpaceId | null;
-  spaceName: string;
-  cwd: string;
-  primaryLabel: string;
-  secondaryLabel: string | null;
-}
-
-/**
- * Existing projects switch the draft into that project; raw paths stay workspace roots.
- *
- * Module scope on purpose: the caller runs this inside a `try`, and React Compiler cannot lower a
- * conditional expression there — inlining it makes the whole picker skip compilation.
- */
 /** Full-width action row in the picker footer (add project, reset to home). */
 const PICKER_FOOTER_ACTION_CLASS_NAME = cn(
   "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm",
   ELEVATED_HOVER_SURFACE_CLASS_NAME,
   "hover:text-[var(--color-text-foreground)]",
 );
-
-function startActiveFolderSelection(
-  folder: ActiveFolderOption,
-  handlers: {
-    isProjectSelectionMode: boolean;
-    onSelectProject?: ((projectId: ProjectId) => void | Promise<void>) | undefined;
-    onSelectWorkspaceRoot?: ((workspaceRoot: string) => void) | undefined;
-  },
-): void | Promise<void> {
-  if (folder.projectId && handlers.onSelectProject) {
-    return handlers.onSelectProject(folder.projectId);
-  }
-  if (handlers.isProjectSelectionMode) {
-    return undefined;
-  }
-  return handlers.onSelectWorkspaceRoot?.(folder.cwd);
-}
-
-function basenameOfPath(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const normalized = value.replace(/[\\/]+$/, "");
-  const separatorIndex = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"));
-  const basename = separatorIndex === -1 ? normalized : normalized.slice(separatorIndex + 1);
-  return basename.length > 0 ? basename : null;
-}
-
-function directorySearchHaystack(entry: ProjectDirectoryEntry): string {
-  return [entry.name, entry.path].join(" ").toLowerCase();
-}
-
-function joinDirectoryPath(rootPath: string, relativePath: string): string {
-  if (!relativePath) return rootPath;
-  const separator = rootPath.includes("\\") ? "\\" : "/";
-  const normalizedRoot = rootPath.endsWith(separator) ? rootPath.slice(0, -1) : rootPath;
-  const normalizedRelative = relativePath.split(/[\\/]+/).join(separator);
-  return `${normalizedRoot}${separator}${normalizedRelative}`;
-}
-
-function getNavigatorPlatform(): string {
-  const navigatorLike = globalThis.navigator as
-    | (Navigator & { userAgentData?: { platform?: string } })
-    | undefined;
-  return [navigatorLike?.platform, navigatorLike?.userAgentData?.platform]
-    .filter(Boolean)
-    .join(" ");
-}
 
 export const ProjectPicker = memo(function ProjectPicker({
   align: alignProp,
@@ -617,101 +564,104 @@ export const ProjectPicker = memo(function ProjectPicker({
           ) : null}
         </div>
       )}
-      <ComboboxPopup align={align} side={side} className="p-0">
-        <PickerPanelShell
-          searchPlaceholder={searchPlaceholder}
-          query={query}
-          onQueryChange={setQuery}
-          footer={
-            <>
-              <button
-                type="button"
-                className={cn(
-                  PICKER_FOOTER_ACTION_CLASS_NAME,
-                  "disabled:cursor-not-allowed disabled:opacity-60",
-                )}
-                onClick={() => void handleAddNewProject()}
-                disabled={isPicking}
-              >
-                <PlusIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
-                <span className="truncate">
-                  {isPicking ? loadingAddProjectLabel : addProjectLabel}
-                </span>
-              </button>
-              {shouldShowResetToHome ? (
-                <button
-                  type="button"
-                  className={PICKER_FOOTER_ACTION_CLASS_NAME}
-                  onClick={handleResetToHome}
+      <ComboboxPopup align={align} side={side} className="w-72 p-0">
+        {/* ComboboxInput (not a plain Input) so Base UI autofocuses it on open and
+            Arrow/Enter keep driving list highlight + selection while typing to filter. */}
+        <div className="sticky top-0 z-20 shrink-0 border-b border-border bg-[var(--composer-surface)] p-1">
+          <ComboboxInput
+            className="rounded-md border-border/60 bg-background shadow-none before:hidden has-focus-visible:border-neutral-500/15 has-focus-visible:ring-0 [&_input]:font-sans"
+            inputClassName="ring-0"
+            placeholder={searchPlaceholder}
+            showTrigger={false}
+            size="sm"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
+        <ComboboxEmpty>
+          {isLoadingDirectories
+            ? "Loading folders…"
+            : activeFolderOptions.length === 0 && localFolderOptions.length === 0
+              ? "No folders found"
+              : "No matches"}
+        </ComboboxEmpty>
+        <ComboboxList className="max-h-64">
+          {filteredActiveFolderGroups.map((group, groupIndex) => {
+            const precedingOptionCount = filteredActiveFolderGroups
+              .slice(0, groupIndex)
+              .reduce((count, candidate) => count + candidate.items.length, 0);
+            return (
+              <Fragment key={group.key}>
+                {groupIndex > 0 ? <ComboboxSeparator /> : null}
+                <ComboboxGroup>
+                  <ComboboxGroupLabel className="flex items-center gap-1.5">
+                    <SpaceIcon icon={group.icon} className="size-3 shrink-0" />
+                    <span className="min-w-0 truncate">{group.label}</span>
+                  </ComboboxGroupLabel>
+                  {group.items.map((folder, index) =>
+                    renderActiveFolderOption(folder, precedingOptionCount + index),
+                  )}
+                </ComboboxGroup>
+              </Fragment>
+            );
+          })}
+          {filteredActiveFolderOptions.length > 0 && filteredLocalFolderOptions.length > 0 ? (
+            <ComboboxSeparator />
+          ) : null}
+          {filteredLocalFolderOptions.length > 0 ? (
+            <ComboboxGroup>
+              <ComboboxGroupLabel>{localFoldersGroupLabel}</ComboboxGroupLabel>
+              {filteredLocalFolderOptions.map(({ absolutePath, entry }, index) => (
+                <ComboboxItem
+                  hideIndicator={absolutePath !== selectedWorkspaceRoot}
+                  key={absolutePath}
+                  index={filteredActiveFolderOptions.length + index}
+                  value={absolutePath}
+                  onClick={() => {
+                    onSelectWorkspaceRoot?.(absolutePath);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    absolutePath === selectedWorkspaceRoot &&
+                      "bg-[var(--color-background-elevated-secondary)] text-[var(--color-text-foreground)]",
+                  )}
                 >
-                  <XIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
-                  <span className="truncate">{resetActionLabel}</span>
-                </button>
-              ) : null}
-              {errorMessage ? (
-                <div className="px-2 pb-1 text-destructive text-xs">{errorMessage}</div>
-              ) : null}
-            </>
-          }
-        >
-          <ComboboxEmpty>
-            {isLoadingDirectories
-              ? "Loading folders…"
-              : activeFolderOptions.length === 0 && localFolderOptions.length === 0
-                ? "No folders found"
-                : "No matches"}
-          </ComboboxEmpty>
-          <ComboboxList className="max-h-64">
-            {filteredActiveFolderGroups.map((group, groupIndex) => {
-              const precedingOptionCount = filteredActiveFolderGroups
-                .slice(0, groupIndex)
-                .reduce((count, candidate) => count + candidate.items.length, 0);
-              return (
-                <Fragment key={group.key}>
-                  {groupIndex > 0 ? <ComboboxSeparator /> : null}
-                  <ComboboxGroup>
-                    <ComboboxGroupLabel className="flex items-center gap-1.5">
-                      <SpaceIcon icon={group.icon} className="size-3 shrink-0" />
-                      <span className="min-w-0 truncate">{group.label}</span>
-                    </ComboboxGroupLabel>
-                    {group.items.map((folder, index) =>
-                      renderActiveFolderOption(folder, precedingOptionCount + index),
-                    )}
-                  </ComboboxGroup>
-                </Fragment>
-              );
-            })}
-            {filteredActiveFolderOptions.length > 0 && filteredLocalFolderOptions.length > 0 ? (
-              <ComboboxSeparator />
-            ) : null}
-            {filteredLocalFolderOptions.length > 0 ? (
-              <ComboboxGroup>
-                <ComboboxGroupLabel>{localFoldersGroupLabel}</ComboboxGroupLabel>
-                {filteredLocalFolderOptions.map(({ absolutePath, entry }, index) => (
-                  <ComboboxItem
-                    hideIndicator={absolutePath !== selectedWorkspaceRoot}
-                    key={absolutePath}
-                    index={filteredActiveFolderOptions.length + index}
-                    value={absolutePath}
-                    onClick={() => {
-                      onSelectWorkspaceRoot?.(absolutePath);
-                      setOpen(false);
-                    }}
-                    className={cn(
-                      absolutePath === selectedWorkspaceRoot &&
-                        "bg-[var(--color-background-elevated-secondary)] text-[var(--color-text-foreground)]",
-                    )}
-                  >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <FolderClosed className="size-3.5 shrink-0 text-muted-foreground/70" />
-                      <span className="truncate">{entry.name}</span>
-                    </div>
-                  </ComboboxItem>
-                ))}
-              </ComboboxGroup>
-            ) : null}
-          </ComboboxList>
-        </PickerPanelShell>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <FolderClosed className="size-3.5 shrink-0 text-muted-foreground/70" />
+                    <span className="truncate">{entry.name}</span>
+                  </div>
+                </ComboboxItem>
+              ))}
+            </ComboboxGroup>
+          ) : null}
+        </ComboboxList>
+        <div className="border-t p-1">
+          <button
+            type="button"
+            className={cn(
+              PICKER_FOOTER_ACTION_CLASS_NAME,
+              "disabled:cursor-not-allowed disabled:opacity-60",
+            )}
+            onClick={() => void handleAddNewProject()}
+            disabled={isPicking}
+          >
+            <PlusIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
+            <span className="truncate">{isPicking ? loadingAddProjectLabel : addProjectLabel}</span>
+          </button>
+          {shouldShowResetToHome ? (
+            <button
+              type="button"
+              className={PICKER_FOOTER_ACTION_CLASS_NAME}
+              onClick={handleResetToHome}
+            >
+              <XIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
+              <span className="truncate">{resetActionLabel}</span>
+            </button>
+          ) : null}
+          {errorMessage ? (
+            <div className="px-2 pb-1 text-destructive text-xs">{errorMessage}</div>
+          ) : null}
+        </div>
       </ComboboxPopup>
     </Combobox>
   );

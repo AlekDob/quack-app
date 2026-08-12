@@ -5,7 +5,7 @@ stack: React / Vite / TypeScript
 created: 2026-08-05
 startDate: 2026-08-05
 endDate: 2026-08-05
-last_verified: 2026-08-05
+last_verified: 2026-08-11
 status: active
 tags: [composer, activity-strip, subagents, browser-automation, background-work]
 ---
@@ -34,11 +34,13 @@ Renamed from `ComposerSubagentStrip.tsx` / `.logic.ts` (git mv, no new files for
 - **Browser automation:** `ThreadBrowserState.automation` (from `useBrowserStateStore(selectThreadBrowserState(threadId))`, delivered over Electron IPC `desktop:browser-state`) → `browserAutomationRow()` → one `kind: "activity"` row while `automation.phase !== "idle"`.
 - **Agent commands:** `WorkLogEntry` with `itemType === "command_execution"` and `toolStatus === "running"` → `runningCommandRows()`, deduped by `` `command:${toolCallId ?? id}` `` → one `kind: "activity"` row per running command; retires itself once `toolStatus` moves to `completed`/`failed`/`cancelled`.
 - Both row kinds merge in `deriveComposerActivityStripRows`, attention rows first, then subagents, then the rest of the background rows.
+- On a top-level thread, `stripRawWorkLogEntries` reuses the already-derived `rawWorkLogEntries` (`ChatView.logic.resolveComposerStripWorkLogEntries`) instead of re-deriving from `stripSourceActivities` on every live activity tick — the re-derive path only runs for subagent threads, which have a distinct parent source.
 
 ### Key Functions
 
 - `deriveComposerActivityStripRows(input) → ComposerActivityStripRow[]` — single entry point ChatView calls; returns `[]` when there is nothing to show.
 - `deriveComposerBackgroundActivityRows({ workEntries, browserState }) → ComposerActivityStripBackgroundItem[]` — the non-subagent half, also unit-tested standalone.
+- `resolveComposerStripWorkLogEntries({ hasDistinctParentSource, activeWorkLogEntries, deriveParentWorkLogEntries }) → WorkLogEntry[]` — picks the cheap path (reuse) vs. the parent-derive path; avoids scanning and normalizing the full activity history twice per live update on long threads.
 - `activityStripHeaderLabel(rows) → string` — one header string for all three cases: subagents-only ("N of M subagents running"), background-only ("N background activities"), mixed ("N of M running").
 
 ### State

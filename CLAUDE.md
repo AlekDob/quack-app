@@ -6,6 +6,7 @@
 - Treat `bun fmt`, `bun lint`, and `bun typecheck` as heavyweight workspace checks: bundle them into one final verification pass per task whenever possible, and avoid rerunning the full set repeatedly during iteration.
 - If a user asks for a small follow-up right after a recent full verification pass, prefer no rerun or the smallest reasonable re-check unless the user explicitly asks for full validation again.
 - NEVER run `bun test`. Always use `bun run test` (runs Vitest).
+- NEVER run a React Compiler transform under `bun`. Debugging a bailout in `chatHotPath.compiler.test.ts` usually means copying its `compileEvents()` helper into a scratch script. Run that script with `node`, not `bun`: React Compiler memory grows faster than file size, and on `ChatView.tsx` (~12k lines) it climbs past 12 GB. Node self-limits at roughly 4.3 GB and dies on its own; Bun uses JavaScriptCore, has no default heap ceiling, and will take the machine down instead (macOS watchdog reboot, 2026-08-06). Vitest workers already run under Node, so the suite itself is safe.
 
 ## Project Snapshot
 
@@ -66,6 +67,8 @@ gpt-5.6-sol is exceptionally capable on long-running tasks. Give it substantial,
 ## Maintainability
 
 Long term maintainability is a core priority. If you add new functionality, first check if there is shared logic that can be extracted to a separate module. Duplicate logic across multiple files is a code smell and should be avoided. Don't be afraid to change existing code. Don't take shortcuts by just adding local logic to solve a problem.
+
+**Twin projections gotcha**: the server (`apps/server/src/orchestration/Layers/ProjectionPipeline.ts`) and the web client (`apps/web/src/storeEventReducer.ts`) independently project the same activity stream. Any settlement/state rule added to one MUST be mirrored in the other — a divergence never crashes, it just leaves the UI wrong until the next full snapshot, which reads as a random self-healing freeze. See `documentation/bugs/2026-08-06-composer-queue-stuck-stale-approval.md`.
 
 ## UI Conventions
 

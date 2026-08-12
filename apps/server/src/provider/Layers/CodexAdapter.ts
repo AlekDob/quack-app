@@ -465,6 +465,8 @@ function toRequestTypeFromMethod(method: string): CanonicalRequestType {
       return "file_change_approval";
     case "item/permissions/requestApproval":
       return "permissions_approval";
+    case "mcpServer/elicitation/request":
+      return "plugin_install_approval";
     case "applyPatchApproval":
       return "apply_patch_approval";
     case "execCommandApproval":
@@ -490,6 +492,8 @@ function toRequestTypeFromKind(kind: unknown): CanonicalRequestType {
       return "file_change_approval";
     case "permissions":
       return "permissions_approval";
+    case "plugin-install":
+      return "plugin_install_approval";
     default:
       return "unknown";
   }
@@ -926,7 +930,10 @@ function mapToRuntimeEvents(
     }
 
     const detail =
-      asString(payload?.command) ?? asString(payload?.reason) ?? asString(payload?.prompt);
+      asString(payload?.command) ??
+      asString(payload?.reason) ??
+      asString(payload?.prompt) ??
+      asString(payload?.message);
     return [
       {
         ...runtimeEventBase(event, canonicalThreadId),
@@ -1856,6 +1863,9 @@ const makeCodexAdapter = (options?: CodexAdapterLiveOptions) =>
           : {}),
         ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
         ...(input.resumeCursor !== undefined ? { resumeCursor: input.resumeCursor } : {}),
+        ...(input.forkSourceResumeCursor !== undefined
+          ? { forkSourceResumeCursor: input.forkSourceResumeCursor }
+          : {}),
         ...(input.providerOptions !== undefined ? { providerOptions: input.providerOptions } : {}),
         runtimeMode: input.runtimeMode,
         ...codexModelSelectionOverrides(input.modelSelection),

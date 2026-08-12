@@ -74,6 +74,7 @@ function serverSettings(overrides: Partial<ServerSettings["providers"]> = {}): S
         experimentalWebSockets: false,
       },
       pi: { ...provider, binaryPath: "pi", agentDir: "" },
+      astronaut: { ...provider, serverUrl: "http://companion.local:4567" },
       ...overrides,
     },
     skills: { disabled: [] },

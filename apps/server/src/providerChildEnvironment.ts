@@ -4,6 +4,7 @@
 
 export type ProviderChildKind =
   | "acp"
+  | "astronaut"
   | "antigravity"
   | "claude"
   | "codex"
@@ -50,6 +51,8 @@ const PROVIDER_CREDENTIAL_GRANTS: Record<ProviderChildKind, "all" | ReadonlySet<
   kilo: "all",
   opencode: "all",
   pi: "all",
+  // Companion never spawns a local child: it proxies the paired machine.
+  astronaut: new Set<string>(),
 };
 
 const INHERITED_NATIVE_CAPABILITY_KEYS = new Set([

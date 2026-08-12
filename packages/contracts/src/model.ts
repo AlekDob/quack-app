@@ -144,6 +144,12 @@ export const DroidModelOptions = Schema.Struct({
 });
 export type DroidModelOptions = typeof DroidModelOptions.Type;
 
+// Companion proxies a remote machine: the paired host owns the model options,
+// so nothing is selectable locally. Declared anyway to keep the per-provider
+// records exhaustive over ProviderKind.
+export const AstronautModelOptions = Schema.Struct({});
+export type AstronautModelOptions = typeof AstronautModelOptions.Type;
+
 export const ProviderModelOptions = Schema.Struct({
   codex: Schema.optional(CodexModelOptions),
   claudeAgent: Schema.optional(ClaudeModelOptions),
@@ -154,6 +160,7 @@ export const ProviderModelOptions = Schema.Struct({
   kilo: Schema.optional(OpenCodeModelOptions),
   opencode: Schema.optional(OpenCodeModelOptions),
   pi: Schema.optional(PiModelOptions),
+  astronaut: Schema.optional(AstronautModelOptions),
 });
 export type ProviderModelOptions = typeof ProviderModelOptions.Type;
 
@@ -826,6 +833,9 @@ export const MODEL_OPTIONS_BY_PROVIDER = {
   ],
   // Pi discovery owns the live catalog, including auth-gated Anthropic models.
   pi: [],
+  // Companion is a remote host: its catalogue is whatever the paired machine
+  // reports over /status, so there is nothing to hardcode here.
+  astronaut: [],
   cursor: [
     {
       // Cursor exposes auto as the `default` model id over ACP; the adapter maps it.
@@ -1017,7 +1027,10 @@ export type ModelOptionsByProvider = typeof MODEL_OPTIONS_BY_PROVIDER;
 type BuiltInModelSlug = (typeof MODEL_OPTIONS_BY_PROVIDER)[ProviderKind][number]["slug"];
 export type ModelSlug = BuiltInModelSlug | (string & {});
 
-export type ProviderWithDefaultModel = Exclude<ProviderKind, "pi">;
+// Pi and Companion have no built-in default: Pi discovers its catalogue, and
+// Companion's models live on the paired machine. Inventing a slug here would
+// make the picker offer a model that may not exist.
+export type ProviderWithDefaultModel = Exclude<ProviderKind, "pi" | "astronaut">;
 
 export const DEFAULT_MODEL_BY_PROVIDER: Record<ProviderWithDefaultModel, ModelSlug> = {
   codex: "gpt-5.5",
@@ -1162,6 +1175,7 @@ export const MODEL_SLUG_ALIASES_BY_PROVIDER: Record<ProviderKind, Record<string,
   kilo: {},
   opencode: {},
   pi: {},
+  astronaut: {},
 };
 
 // ── Agent mention aliases ─────────────────────────────────────────────
@@ -1198,4 +1212,5 @@ export const PROVIDER_DISPLAY_NAMES: Record<ProviderKind, string> = {
   kilo: "Kilo",
   opencode: "OpenCode",
   pi: "Pi",
+  astronaut: "Companion",
 };

@@ -6,6 +6,7 @@ import {
   type ServerSettingsPatch,
 } from "@synara/contracts";
 import { deepMerge, type DeepPartial } from "./Struct";
+import { hasDefaultModel } from "./model";
 
 function shouldReplaceTextGenerationModelSelection(
   patch: ServerSettingsPatch["textGenerationModelSelection"] | undefined,
@@ -27,7 +28,7 @@ export function applyServerSettingsPatch(
   const model =
     selectionPatch.model ??
     (selectionPatch.provider &&
-    selectionPatch.provider !== "pi" &&
+    hasDefaultModel(selectionPatch.provider) &&
     selectionPatch.provider !== current.textGenerationModelSelection.provider
       ? DEFAULT_MODEL_BY_PROVIDER[selectionPatch.provider]
       : current.textGenerationModelSelection.model);
@@ -83,6 +84,9 @@ export function providerStartOptionsFromServerSettings(
     pi: {
       ...(providers.pi.binaryPath ? { binaryPath: providers.pi.binaryPath } : {}),
       ...(providers.pi.agentDir ? { agentDir: providers.pi.agentDir } : {}),
+    },
+    astronaut: {
+      ...(providers.astronaut.serverUrl ? { serverUrl: providers.astronaut.serverUrl } : {}),
     },
   };
 }

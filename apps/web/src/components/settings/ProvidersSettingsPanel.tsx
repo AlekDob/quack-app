@@ -81,7 +81,8 @@ type ProviderInstallTextKey =
   | "openCodeBinaryPath"
   | "openCodeServerUrl"
   | "piBinaryPath"
-  | "piAgentDir";
+  | "piAgentDir"
+  | "astronautServerUrl";
 type ProviderInstallPasswordKey = "kiloServerPassword" | "openCodeServerPassword";
 type ProviderInstallPasswordConfiguredKey =
   | "kiloServerPasswordConfigured"
@@ -372,6 +373,19 @@ const PROVIDER_INSTALL_SETTINGS: readonly ProviderInstallSettings[] = [
         label: "Pi agent directory",
         placeholder: "Pi agent directory",
         description: "Optional custom Pi agent directory for auth, models, skills, and commands.",
+      },
+    ],
+  },
+  {
+    provider: "astronaut",
+    docs: [],
+    fields: [
+      {
+        kind: "text",
+        settingsKey: "astronautServerUrl",
+        label: "Companion server URL",
+        placeholder: "http://imac-di-alek:4567",
+        description: "Your Companion on Tailscale.",
       },
     ],
   },

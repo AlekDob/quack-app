@@ -20,6 +20,8 @@ import {
   type WorktreeSetupSnapshot,
   type WorktreeSetupStep,
 } from "../../types";
+import { CLAUDE_AUTH_RECOVERY_KEY } from "../../lib/claudeAuthRecovery";
+import type { ClaudeAuthRecoveryStatus } from "./ClaudeAuthRecoveryCard";
 
 export const MAX_VISIBLE_WORK_LOG_ENTRIES = 6;
 
@@ -289,6 +291,13 @@ export type MessagesTimelineRow =
       id: string;
       steps: ReadonlyArray<WorktreeSetupStep>;
       open: boolean;
+    }
+  | {
+      kind: "claude-auth-recovery";
+      id: string;
+      status: ClaudeAuthRecoveryStatus;
+      error: string | null;
+      unavailableReason: string | null;
     };
 
 export interface StableMessagesTimelineRowsState {
@@ -513,6 +522,12 @@ export function deriveMessagesTimelineRows(input: {
   activeTurnStartedAt: string | null;
   turnDiffSummaryByAssistantMessageId: ReadonlyMap<MessageId, TurnDiffSummary>;
   revertTurnCountByUserMessageId: ReadonlyMap<MessageId, number>;
+  claudeAuthRecovery?: {
+    status: ClaudeAuthRecoveryStatus;
+    authenticated?: boolean;
+    error: string | null;
+    unavailableReason: string | null;
+  } | null;
 }): MessagesTimelineRow[] {
   const nextRows: MessagesTimelineRow[] = [];
   const timelineMessages = input.timelineEntries.flatMap((entry) =>
@@ -703,6 +718,14 @@ export function deriveMessagesTimelineRows(input: {
     activeTurnInProgress: input.activeTurnInProgress ?? false,
     activeTurnId: input.activeTurnId ?? null,
   });
+
+  if (input.claudeAuthRecovery) {
+    nextRows.push({
+      kind: "claude-auth-recovery",
+      id: CLAUDE_AUTH_RECOVERY_KEY,
+      ...input.claudeAuthRecovery,
+    });
+  }
 
   // The live turn wears a "Working for Xs" header + divider — the counting-up
   // twin of a settled turn's "Worked for Xs" disclosure. It anchors to the top
@@ -1155,6 +1178,15 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
           const other = bw.steps[index]!;
           return step.id === other.id && step.status === other.status && step.label === other.label;
         })
+      );
+    }
+
+    case "claude-auth-recovery": {
+      const bw = b as typeof a;
+      return (
+        a.status === bw.status &&
+        a.error === bw.error &&
+        a.unavailableReason === bw.unavailableReason
       );
     }
 

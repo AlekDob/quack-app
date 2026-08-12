@@ -79,6 +79,13 @@ export const PiServerProviderSettings = Schema.Struct({
 });
 export type PiServerProviderSettings = typeof PiServerProviderSettings.Type;
 
+export const AstronautServerProviderSettings = Schema.Struct({
+  ...ProviderSettingsBase,
+  enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(() => true)),
+  serverUrl: StringSetting.pipe(Schema.withDecodingDefault(() => "http://imac-di-alek:4567")),
+});
+export type AstronautServerProviderSettings = typeof AstronautServerProviderSettings.Type;
+
 const DisabledSkillNames = Schema.Array(Schema.String.check(Schema.isMaxLength(256))).pipe(
   Schema.withDecodingDefault(() => []),
 );
@@ -111,6 +118,7 @@ export const ServerSettings = Schema.Struct({
     kilo: KiloServerProviderSettings.pipe(Schema.withDecodingDefault(() => ({}))),
     opencode: OpenCodeServerProviderSettings.pipe(Schema.withDecodingDefault(() => ({}))),
     pi: PiServerProviderSettings.pipe(Schema.withDecodingDefault(() => ({}))),
+    astronaut: AstronautServerProviderSettings.pipe(Schema.withDecodingDefault(() => ({}))),
   }).pipe(Schema.withDecodingDefault(() => ({}))),
   skills: SkillsServerSettings.pipe(Schema.withDecodingDefault(() => ({}))),
 });
@@ -188,6 +196,12 @@ export const ServerSettingsPatch = Schema.Struct({
           ...ProviderSettingsBasePatch,
           binaryPath: Schema.optionalKey(StringSetting),
           agentDir: Schema.optionalKey(StringSetting),
+        }),
+      ),
+      astronaut: Schema.optionalKey(
+        Schema.Struct({
+          ...ProviderSettingsBasePatch,
+          serverUrl: Schema.optionalKey(StringSetting),
         }),
       ),
     }),

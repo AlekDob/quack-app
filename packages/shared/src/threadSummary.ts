@@ -23,7 +23,12 @@ export interface PendingThreadRequestIds {
 }
 
 export type PendingThreadRequestKind = "approval" | "user-input";
-export type ApprovalRequestKind = "command" | "file-read" | "file-change" | "permissions";
+export type ApprovalRequestKind =
+  | "command"
+  | "file-read"
+  | "file-change"
+  | "permissions"
+  | "plugin-install";
 
 export function pendingRequestInstanceKey(requestId: string, lifecycleGeneration?: string): string {
   return `${requestId}\u0000${lifecycleGeneration ?? "legacy"}`;
@@ -67,6 +72,8 @@ export function approvalRequestKindFromRequestType(
       return "file-change";
     case "permissions_approval":
       return "permissions";
+    case "plugin_install_approval":
+      return "plugin-install";
     default:
       return null;
   }
@@ -203,7 +210,8 @@ export function derivePendingThreadRequestIds(input: {
         payload?.requestKind === "command" ||
         payload?.requestKind === "file-read" ||
         payload?.requestKind === "file-change" ||
-        payload?.requestKind === "permissions"
+        payload?.requestKind === "permissions" ||
+        payload?.requestKind === "plugin-install"
           ? payload.requestKind
           : approvalRequestKindFromRequestType(payload?.requestType);
       if (requestKind) {

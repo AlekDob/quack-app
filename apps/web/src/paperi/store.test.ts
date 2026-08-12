@@ -56,16 +56,12 @@ describe("usePaperoStore", () => {
     expect(store.resolveModelForCurrentProvider("builder", "claudeAgent")).toBeNull();
   });
 
-  it("saves and clears instruction overrides", () => {
-    const store = usePaperoStore.getState();
-    store.setInstructions("builder", "CUSTOM: ship smaller diffs.");
-    expect(usePaperoStore.getState().getOverrides("builder")?.instructions).toBe(
-      "CUSTOM: ship smaller diffs.",
-    );
+  it("still resolves pre-migration overrides left in localStorage", () => {
+    usePaperoStore.setState({
+      overridesByPaperoId: { builder: { instructions: "CUSTOM: ship smaller diffs." } },
+    });
     expect(usePaperoStore.getState().resolveEffectiveDefinition("builder").instructions).toBe(
       "CUSTOM: ship smaller diffs.",
     );
-    store.setInstructions("builder", null);
-    expect(usePaperoStore.getState().getOverrides("builder")?.instructions).toBeUndefined();
   });
 });

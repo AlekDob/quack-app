@@ -319,6 +319,12 @@ const composerProviderRegistry: Record<ProviderKind, ProviderRegistryEntry> = {
     renderTraitsMenuContent: (input) => renderTraitsMenuContentForProvider("pi", input),
     renderTraitsPicker: (input) => renderTraitsPickerForProvider("pi", input),
   },
+  // Companion exposes no local traits: the paired machine owns model config.
+  astronaut: {
+    getState: (input) => getProviderStateFromCapabilities(input),
+    renderTraitsMenuContent: () => null,
+    renderTraitsPicker: () => null,
+  },
 };
 
 export function getComposerProviderState(input: ComposerProviderStateInput): ComposerProviderState {

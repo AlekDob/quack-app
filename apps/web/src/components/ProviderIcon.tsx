@@ -11,6 +11,7 @@ import { CentralIcon } from "~/lib/central-icons";
 import { cn } from "~/lib/utils";
 import {
   AntigravityIcon,
+  AstronautIcon,
   ClaudeAI,
   CursorIcon,
   DroidIcon,
@@ -73,6 +74,7 @@ export const PROVIDER_ICON_COMPONENT_BY_PROVIDER: Record<ProviderKind, Icon> = {
   kilo: KiloIcon,
   opencode: OpenCodeProviderIcon,
   pi: PiIcon,
+  astronaut: AstronautIcon,
 };
 
 export function providerIconToneClassName(

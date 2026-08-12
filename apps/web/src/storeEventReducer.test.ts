@@ -1943,6 +1943,51 @@ describe("store event reducer", () => {
     expect(next.sidebarThreadSummaryById["thread-1"]?.hasPendingApprovals).toBe(false);
   });
 
+  it("settles a still-pending approval when reconciliation reports it stale without a response command", () => {
+    const initialState = syncServerReadModel(
+      makeState(makeThread({ hasPendingApprovals: true })),
+      makeReadModel(
+        makeReadModelThread({
+          hasPendingApprovals: true,
+          pendingInteractions: [
+            {
+              interactionKind: "approval",
+              requestId: ApprovalRequestId.makeUnsafe("request-1"),
+              threadId: ThreadId.makeUnsafe("thread-1"),
+              turnId: null,
+              lifecycleGeneration: "generation-1",
+              status: "pending",
+              decision: null,
+              responseCommandId: null,
+              responseRequestedAt: null,
+              createdAt: "2026-02-27T00:00:30.000Z",
+              resolvedAt: null,
+            },
+          ],
+        }),
+      ),
+    );
+
+    const next = applyOrchestrationEvents(initialState, [
+      makeDomainEvent("thread.activity-appended", {
+        threadId: ThreadId.makeUnsafe("thread-1"),
+        activity: makeActivity({
+          id: "activity-approval-stale",
+          createdAt: "2026-02-27T00:01:00.000Z",
+          kind: "provider.approval.respond.failed",
+          payload: {
+            requestId: "request-1",
+            lifecycleGeneration: "generation-1",
+            detail: "Stale pending approval request request-1.",
+          },
+          sequence: 2,
+        }),
+      }),
+    ]);
+
+    expect(threadsOf(next)[0]?.pendingInteractions?.[0]?.status).toBe("uncertain");
+  });
+
   it("updates sidebar summaries during hot-path archive events", () => {
     const initialState = syncServerReadModel(
       makeState(makeThread({ title: "Archivable thread" })),

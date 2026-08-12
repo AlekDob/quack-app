@@ -5,16 +5,12 @@
 import {
   AddPlusIcon,
   ArchiveIcon,
-  BookIcon,
   ChatBubbleIcon,
-  CircleQuestionIcon,
   ClockIcon,
   CopyIcon,
   ExternalLinkIcon,
   FolderOpenIcon,
-  GiftIcon,
   KanbanIcon,
-  KeyboardIcon,
   BellIcon,
   type LucideIcon,
   NewThreadIcon,
@@ -209,6 +205,7 @@ import {
 } from "./SidebarThreadRowContent";
 import { RenameDialog } from "./RenameDialog";
 import { RenameThreadDialog } from "./RenameThreadDialog";
+import { SidebarHelpMenu } from "./SidebarHelpMenu";
 import {
   SidebarSearchPalette,
   type ImportProviderKind,
@@ -219,7 +216,6 @@ import { useHandleNewStudioChat } from "../hooks/useHandleNewStudioChat";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { useThreadHandoff } from "../hooks/useThreadHandoff";
 import { useFeedbackDialogStore } from "../feedbackDialogStore";
-import { openExternalLink } from "~/lib/linkChips";
 import { selectThreadTerminalState, useTerminalStateStore } from "../terminalStateStore";
 import { toastManager } from "./ui/toast";
 import {
@@ -885,11 +881,6 @@ function ProjectSortMenu({
   );
 }
 
-const SYNARA_CHANGELOG_URL = "https://trysynara.com/changelog";
-const SYNARA_DOCS_URL = "https://trysynara.com/docs";
-
-// Footer help menu; swapped out for the desktop-update pill while an update is
-// available (see SidebarFooter).
 function PendingSidebarThreadSkeleton() {
   return (
     <SidebarMenuSubItem
@@ -904,56 +895,6 @@ function PendingSidebarThreadSkeleton() {
         <Skeleton className="h-3 w-3/5 max-w-36" />
       </div>
     </SidebarMenuSubItem>
-  );
-}
-
-function SidebarHelpMenu({
-  onOpenShortcuts,
-  onOpenFeedback,
-}: {
-  onOpenShortcuts: () => void;
-  onOpenFeedback: () => void;
-}) {
-  return (
-    <Menu>
-      <SidebarIconButton
-        render={<MenuTrigger />}
-        icon={CircleQuestionIcon}
-        label="Help"
-        tooltip="Help"
-      />
-      <ComposerPickerMenuPopup
-        align="end"
-        side="top"
-        className={SIDEBAR_CONTEXT_MENU_PANEL_CLASS_NAME}
-      >
-        <MenuGroup>
-          <MenuItem
-            className={SIDEBAR_CONTEXT_MENU_ITEM_CLASS_NAME}
-            onClick={() => openExternalLink(SYNARA_CHANGELOG_URL)}
-          >
-            <SidebarContextMenuIcon icon={GiftIcon} />
-            <span>What’s new</span>
-          </MenuItem>
-          <MenuItem className={SIDEBAR_CONTEXT_MENU_ITEM_CLASS_NAME} onClick={onOpenShortcuts}>
-            <SidebarContextMenuIcon icon={KeyboardIcon} />
-            <span>Keyboard shortcuts</span>
-          </MenuItem>
-          <MenuSeparator />
-          <MenuItem className={SIDEBAR_CONTEXT_MENU_ITEM_CLASS_NAME} onClick={onOpenFeedback}>
-            <SidebarContextMenuIcon icon={ChatBubbleIcon} />
-            <span>Send feedback</span>
-          </MenuItem>
-          <MenuItem
-            className={SIDEBAR_CONTEXT_MENU_ITEM_CLASS_NAME}
-            onClick={() => openExternalLink(SYNARA_DOCS_URL)}
-          >
-            <SidebarContextMenuIcon icon={BookIcon} />
-            <span>Docs</span>
-          </MenuItem>
-        </MenuGroup>
-      </ComposerPickerMenuPopup>
-    </Menu>
   );
 }
 
@@ -2773,22 +2714,24 @@ export default function Sidebar() {
               }
             : null;
       if (!modelSelection) {
-        throw new Error("Select a Pi model before importing a Pi thread.");
+        throw new Error("Select a model before importing this session.");
       }
       const threadId = newThreadId();
       const createdAt = new Date().toISOString();
       const trimmedExternalId = externalId.trim();
       const suffix = trimmedExternalId.slice(-8);
       const title =
-        provider === "claudeAgent"
-          ? `Imported Claude session${suffix ? ` ${suffix}` : ""}`
-          : provider === "cursor"
-            ? `Imported Cursor session${suffix ? ` ${suffix}` : ""}`
-            : provider === "kilo"
-              ? `Imported Kilo session${suffix ? ` ${suffix}` : ""}`
-              : provider === "opencode"
-                ? `Imported OpenCode session${suffix ? ` ${suffix}` : ""}`
-                : `Imported Codex thread${suffix ? ` ${suffix}` : ""}`;
+        provider === "astronaut"
+          ? `Attached Astronaut session${suffix ? ` ${suffix}` : ""}`
+          : provider === "claudeAgent"
+            ? `Imported Claude session${suffix ? ` ${suffix}` : ""}`
+            : provider === "cursor"
+              ? `Imported Cursor session${suffix ? ` ${suffix}` : ""}`
+              : provider === "kilo"
+                ? `Imported Kilo session${suffix ? ` ${suffix}` : ""}`
+                : provider === "opencode"
+                  ? `Imported OpenCode session${suffix ? ` ${suffix}` : ""}`
+                  : `Imported Codex thread${suffix ? ` ${suffix}` : ""}`;
       let createdThread = false;
 
       try {
@@ -5573,6 +5516,7 @@ export default function Sidebar() {
           "claude",
           "cursor",
           "opencode",
+          "astronaut",
         ],
         shortcutLabel: importThreadShortcutLabel,
       },
@@ -6933,14 +6877,14 @@ function SidebarSearchPaletteController(props: {
   const selectAllThreads = useMemo(() => createAllThreadsSelector(), []);
   const selectSidebarDisplayThreads = useMemo(() => createSidebarDisplayThreadsSelector(), []);
   const importProviderCapabilityQueries = useQueries({
-    queries: (["codex", "claudeAgent", "cursor", "kilo", "opencode"] as const).map((provider) =>
-      providerComposerCapabilitiesQueryOptions(provider),
+    queries: (["astronaut", "codex", "claudeAgent", "cursor", "kilo", "opencode"] as const).map(
+      (provider) => providerComposerCapabilitiesQueryOptions(provider),
     ),
   });
   const threads = useStore(selectAllThreads);
   const sidebarDisplayThreads = useStore(selectSidebarDisplayThreads);
   const importProviders: ReadonlyArray<ImportProviderKind> = (
-    ["codex", "claudeAgent", "cursor", "kilo", "opencode"] as const
+    ["astronaut", "codex", "claudeAgent", "cursor", "kilo", "opencode"] as const
   ).filter((provider, index) => supportsThreadImport(importProviderCapabilityQueries[index]?.data));
   const searchPaletteThreads = useMemo<SidebarSearchThread[]>(() => {
     const threadById = new Map(threads.map((thread) => [thread.id, thread] as const));

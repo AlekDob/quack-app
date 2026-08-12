@@ -1,6 +1,6 @@
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { assert, it } from "@effect/vitest";
+import { assert, describe, it } from "@effect/vitest";
 import { ConfigProvider, Effect, Layer } from "effect";
 import * as HttpServer from "effect/unstable/http/HttpServer";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
@@ -9,7 +9,30 @@ import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 import { ServerConfig } from "../../config.ts";
 import { getTelemetryIdentifier } from "../Identify.ts";
 import { AnalyticsService } from "../Services/AnalyticsService.ts";
-import { AnalyticsServiceLayerLive } from "./AnalyticsService.ts";
+import {
+  AnalyticsServiceLayerLive,
+  shouldLogTelemetryFlushFailure,
+  telemetryFlushDelayMs,
+} from "./AnalyticsService.ts";
+
+// Regression: a dead PostHog endpoint used to be retried every second forever,
+// printing a ~2.5KB stack each time. One incident log held 4149 of them and
+// buried every real diagnostic under the noise.
+describe("telemetry flush retry pacing", () => {
+  it("backs off after consecutive failures and caps the delay", () => {
+    assert.equal(telemetryFlushDelayMs(0), 1_000);
+    assert.equal(telemetryFlushDelayMs(1), 2_000);
+    assert.equal(telemetryFlushDelayMs(4), 16_000);
+    assert.equal(telemetryFlushDelayMs(99), 300_000);
+  });
+
+  it("logs the first failure then one in ten", () => {
+    assert.equal(shouldLogTelemetryFlushFailure(1), true);
+    assert.equal(shouldLogTelemetryFlushFailure(2), false);
+    assert.equal(shouldLogTelemetryFlushFailure(9), false);
+    assert.equal(shouldLogTelemetryFlushFailure(10), true);
+  });
+});
 
 interface RecordedBatchRequest {
   readonly path: string;

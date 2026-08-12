@@ -15,7 +15,7 @@ import type {
   ProviderKind,
   RuntimeMode,
 } from "@synara/contracts";
-import { getDefaultModel } from "@synara/shared/model";
+import { getDefaultModel, providerWithDefaultModel } from "@synara/shared/model";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -141,10 +141,10 @@ export function KanbanNewTaskDialog({
   const kanbanDefaultModelSelection = useMemo<ModelSelection>(
     () =>
       selectedProject?.defaultModelSelection ??
-      buildModelSelection(
-        settings.defaultProvider === "pi" ? "codex" : settings.defaultProvider,
-        getDefaultModel(settings.defaultProvider === "pi" ? "codex" : settings.defaultProvider),
-      ),
+      (() => {
+        const provider = providerWithDefaultModel(settings.defaultProvider);
+        return buildModelSelection(provider, getDefaultModel(provider));
+      })(),
     [selectedProject?.defaultModelSelection, settings.defaultProvider],
   );
   const {

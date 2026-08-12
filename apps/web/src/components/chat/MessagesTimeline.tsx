@@ -17,6 +17,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useContext,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -58,12 +59,13 @@ import {
   WorktreeIcon,
 } from "~/lib/icons";
 import { pinActionLabel } from "~/lib/pin";
-import { DEFAULT_PAPERO_ID, isPaperoId, usePaperoStore } from "~/paperi";
+import { DEFAULT_PAPERO_ID, isPaperoId } from "~/paperi";
 import type { PaperoDefinition, PaperoId } from "@synara/shared/paperi";
 import { Button } from "../ui/button";
 import { CrossTaskOriginLabel, type CrossTaskOrigin } from "./CrossTaskOriginLabel";
 import { CHAT_STREAM_AVATAR_GAP_CLASS_NAME } from "./chatLeftGutter";
 import { ChatStreamAvatarSlot, ChatStreamMetaRow } from "./ChatStreamIdentity";
+import { PaperoIdentityContext } from "./paperoIdentityContext";
 import { duckAvatarFor } from "~/lib/duckAvatars";
 import { SynaraThreadCreationCard } from "./SynaraThreadCreationCard";
 import { buildExpandedImagePreview, ExpandedImagePreview } from "./ExpandedImagePreview";
@@ -107,6 +109,7 @@ import {
   resolveAssistantMessageDisplayText,
   type StableMessagesTimelineRowsState,
 } from "./MessagesTimeline.logic";
+import { ClaudeAuthRecoveryCard, type ClaudeAuthRecoveryStatus } from "./ClaudeAuthRecoveryCard";
 import { summarizeToolCallGroup } from "./toolCallGroup.logic";
 import { ToolCallGroupSummaryRow } from "./ToolCallGroupSummaryRow";
 import { useTailAnchorScroll } from "./useTailAnchorScroll";
@@ -478,6 +481,14 @@ interface MessagesTimelineProps {
    * far right; only the content is inset.
    */
   contentInsetRightPx?: number | undefined;
+  claudeAuthRecovery?: {
+    status: ClaudeAuthRecoveryStatus;
+    authenticated?: boolean;
+    error: string | null;
+    unavailableReason: string | null;
+  } | null;
+  onOpenClaudeAuthRecovery?: () => void;
+  onDismissClaudeAuthRecovery?: () => void;
 }
 
 export const MessagesTimeline = memo(function MessagesTimeline({
@@ -536,6 +547,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   contentInsetRightPx,
   subagentStreamAvatarSeed,
   subagentStreamLabel,
+  claudeAuthRecovery: claudeAuthRecoveryProp,
+  onOpenClaudeAuthRecovery,
+  onDismissClaudeAuthRecovery,
 }: MessagesTimelineProps) {
   // Prop defaults are resolved in the body rather than in the destructuring pattern:
   // an `AssignmentPattern` in the parameter list makes React Compiler bail out on the
@@ -556,6 +570,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   }, []);
   const crossTaskOrigin = crossTaskOriginProp ?? null;
   const smoothStreamingText = smoothStreamingTextProp ?? false;
+  const claudeAuthRecovery = claudeAuthRecoveryProp ?? null;
   const normalizedChatFontSizePx = normalizeChatFontSizePx(
     chatFontSizePxProp ?? DEFAULT_CHAT_FONT_SIZE_PX,
   );
@@ -667,9 +682,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     ),
     [],
   );
-  const resolveEffectivePaperoDefinition = usePaperoStore(
-    (store) => store.resolveEffectiveDefinition,
-  );
+  const resolveEffectivePaperoDefinition = useContext(PaperoIdentityContext);
   useTailAnchorScroll({
     listRef: resolvedListRef,
     timelineRootRef,
@@ -693,6 +706,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         activeTurnStartedAt,
         turnDiffSummaryByAssistantMessageId,
         revertTurnCountByUserMessageId,
+        claudeAuthRecovery,
       }),
     [
       timelineEntries,
@@ -703,6 +717,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       activeTurnStartedAt,
       turnDiffSummaryByAssistantMessageId,
       revertTurnCountByUserMessageId,
+      claudeAuthRecovery,
     ],
   );
   const rows = useStableRows(rawRows);
@@ -1254,6 +1269,16 @@ export const MessagesTimeline = memo(function MessagesTimeline({
             </>,
           );
         })()}
+
+      {row.kind === "claude-auth-recovery" ? (
+        <ClaudeAuthRecoveryCard
+          status={row.status}
+          error={row.error}
+          unavailableReason={row.unavailableReason}
+          onOpen={onOpenClaudeAuthRecovery ?? (() => {})}
+          onDismiss={onDismissClaudeAuthRecovery ?? (() => {})}
+        />
+      ) : null}
 
       {row.kind === "message" &&
         row.message.role === "user" &&

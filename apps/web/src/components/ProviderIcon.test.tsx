@@ -6,6 +6,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { PROVIDER_OPTIONS } from "../session-logic";
 import { ProviderIcon, PROVIDER_ICON_COMPONENT_BY_PROVIDER } from "./ProviderIcon";
 
 describe("ProviderIcon", () => {
@@ -26,5 +27,15 @@ describe("ProviderIcon", () => {
     expect(markup).toContain("hidden dark:inline-block");
     expect(markup).toContain("dark:text-foreground/90");
     expect(markup).toContain("/central-icons-reversed/opencode.svg");
+  });
+
+  it("renders an icon for every provider shown in the picker", () => {
+    expect(Object.keys(PROVIDER_ICON_COMPONENT_BY_PROVIDER).toSorted()).toEqual(
+      PROVIDER_OPTIONS.map((option) => option.value).toSorted(),
+    );
+
+    for (const { value: provider } of PROVIDER_OPTIONS) {
+      expect(() => renderToStaticMarkup(<ProviderIcon provider={provider} />)).not.toThrow();
+    }
   });
 });

@@ -95,6 +95,11 @@ interface ChatTranscriptPaneProps {
   worktreeSetup: WorktreeSetupSnapshot | null;
   subagentStreamAvatarSeed?: ComponentProps<typeof MessagesTimeline>["subagentStreamAvatarSeed"];
   subagentStreamLabel?: ComponentProps<typeof MessagesTimeline>["subagentStreamLabel"];
+  claudeAuthRecovery?: ComponentProps<typeof MessagesTimeline>["claudeAuthRecovery"];
+  onOpenClaudeAuthRecovery?: ComponentProps<typeof MessagesTimeline>["onOpenClaudeAuthRecovery"];
+  onDismissClaudeAuthRecovery?: ComponentProps<
+    typeof MessagesTimeline
+  >["onDismissClaudeAuthRecovery"];
 }
 
 export function ChatTranscriptPane({
@@ -158,6 +163,9 @@ export function ChatTranscriptPane({
   worktreeSetup,
   subagentStreamAvatarSeed,
   subagentStreamLabel,
+  claudeAuthRecovery,
+  onOpenClaudeAuthRecovery,
+  onDismissClaudeAuthRecovery,
 }: ChatTranscriptPaneProps) {
   const scrollButtonFrameStyle: CSSProperties | undefined = contentInsetRightPx
     ? { paddingRight: contentInsetRightPx }
@@ -215,6 +223,9 @@ export function ChatTranscriptPane({
             activeTurnId={activeTurnId ?? null}
             activeTurnInProgress={activeTurnInProgress}
             activeTurnStartedAt={activeTurnStartedAt}
+            {...(claudeAuthRecovery !== undefined ? { claudeAuthRecovery } : {})}
+            {...(onOpenClaudeAuthRecovery ? { onOpenClaudeAuthRecovery } : {})}
+            {...(onDismissClaudeAuthRecovery ? { onDismissClaudeAuthRecovery } : {})}
             listRef={listRef}
             {...(timelineControllerRef ? { controllerRef: timelineControllerRef } : {})}
             {...(pinnedMessageIds ? { pinnedMessageIds } : {})}

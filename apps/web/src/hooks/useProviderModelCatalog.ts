@@ -114,6 +114,7 @@ export function useProviderModelCatalog(input: {
   const kiloModelDiscoveryEnabled = shouldDiscoverProvider("kilo");
   const openCodeModelDiscoveryEnabled = shouldDiscoverProvider("opencode");
   const piModelDiscoveryEnabled = shouldDiscoverProvider("pi");
+  const astronautModelDiscoveryEnabled = shouldDiscoverProvider("astronaut");
 
   const claudeDynamicModelsQuery = useQuery(
     providerModelsQueryOptions({
@@ -184,6 +185,13 @@ export function useProviderModelCatalog(input: {
       agentDir: settings.piAgentDir || null,
       cwd: discoveryCwd,
       enabled: piModelDiscoveryEnabled,
+    }),
+  );
+  const astronautDynamicModelsQuery = useQuery(
+    providerModelsQueryOptions({
+      provider: "astronaut",
+      apiEndpoint: settings.astronautServerUrl || null,
+      enabled: astronautModelDiscoveryEnabled,
     }),
   );
 
@@ -294,6 +302,11 @@ export function useProviderModelCatalog(input: {
         customModelsByProvider.opencode,
         modelHintByProvider?.opencode,
       ),
+      astronaut: getAppModelOptions(
+        "astronaut",
+        customModelsByProvider.astronaut,
+        modelHintByProvider?.astronaut,
+      ),
       pi: getAppModelOptions("pi", customModelsByProvider.pi, modelHintByProvider?.pi),
     };
     const result: Record<
@@ -312,6 +325,7 @@ export function useProviderModelCatalog(input: {
       droid: droidDynamicModelsQuery.data,
       kilo: kiloDynamicModelsQuery.data,
       opencode: openCodeDynamicModelsQuery.data,
+      astronaut: astronautDynamicModelsQuery.data,
       pi: piDynamicModelsQuery.data,
     };
     for (const provider of [
@@ -323,6 +337,7 @@ export function useProviderModelCatalog(input: {
       "droid",
       "kilo",
       "opencode",
+      "astronaut",
       "pi",
     ] as const) {
       const dynamicModels = dynamicSources[provider]?.models;
@@ -337,6 +352,7 @@ export function useProviderModelCatalog(input: {
     return result;
   }, [
     antigravityModelsQuery.data,
+    astronautDynamicModelsQuery.data,
     claudeDynamicModelsQuery.data,
     codexDynamicModelsQuery.data,
     cursorDynamicModelsQuery.data,
@@ -381,10 +397,12 @@ export function useProviderModelCatalog(input: {
       droid: droidDynamicModelsQuery.data?.models ?? [],
       kilo: kiloDynamicModelsQuery.data?.models ?? [],
       opencode: openCodeDynamicModelsQuery.data?.models ?? [],
+      astronaut: astronautDynamicModelsQuery.data?.models ?? [],
       pi: piDynamicModelsQuery.data?.models ?? [],
     }),
     [
       antigravityModelsQuery.data?.models,
+      astronautDynamicModelsQuery.data?.models,
       claudeDynamicModelsQuery.data?.models,
       codexDynamicModelsQuery.data?.models,
       cursorRuntimeModels,

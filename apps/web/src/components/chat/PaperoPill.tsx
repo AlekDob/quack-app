@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 
 import { CheckIcon, ChevronRightIcon, FileIcon, SettingsIcon } from "~/lib/icons";
 import { cn } from "~/lib/utils";
-import { paperoSlotProviders, usePaperoStore } from "~/paperi";
+import { paperoSlotProviders } from "~/paperi";
 import { Button } from "../ui/button";
 import { DisclosureChevron } from "../ui/DisclosureChevron";
 import { DisclosureRegion } from "../ui/DisclosureRegion";
@@ -44,23 +44,26 @@ export function PaperoAvatar({
   );
 }
 
+/**
+ * Reads and writes the Team roster, not the legacy papero store: the server resolves
+ * the Team agent for every turn and it wins over anything the client sends, so a
+ * localStorage-only edit here would look saved and change nothing.
+ */
 function PaperoInstructionsPanel(props: {
-  readonly paperoId: PaperoId;
-  readonly onSaveInstructions: (paperoId: PaperoId, instructions: string) => void;
-  readonly onResetInstructions: (paperoId: PaperoId) => void;
+  readonly definition: PaperoDefinition;
+  readonly onSaveInstructions: (paperoId: PaperoId, instructions: string) => void | Promise<void>;
+  readonly onResetInstructions: (paperoId: PaperoId) => void | Promise<void>;
 }) {
-  const resolveEffectiveDefinition = usePaperoStore((store) => store.resolveEffectiveDefinition);
-  const overrides = usePaperoStore((store) => store.overridesByPaperoId[props.paperoId]);
-  const definition = resolveEffectiveDefinition(props.paperoId);
-  const builtinInstructions = getPaperoDefinition(props.paperoId).instructions;
+  const definition = props.definition;
+  const builtinInstructions = getPaperoDefinition(definition.id).instructions;
   const [draft, setDraft] = useState(definition.instructions);
-  const hasCustom = Boolean(overrides?.instructions?.trim());
+  const hasCustom = definition.instructions.trim() !== builtinInstructions.trim();
   const dirty = draft.trim() !== definition.instructions.trim();
   const canReset = hasCustom || draft.trim() !== builtinInstructions.trim();
 
   useEffect(() => {
     setDraft(definition.instructions);
-  }, [definition.instructions, props.paperoId]);
+  }, [definition.instructions, definition.id]);
 
   return (
     <div
@@ -100,7 +103,7 @@ function PaperoInstructionsPanel(props: {
           disabled={!canReset}
           onClick={() => {
             setDraft(builtinInstructions);
-            props.onResetInstructions(props.paperoId);
+            props.onResetInstructions(definition.id);
           }}
         >
           Reset
@@ -112,7 +115,7 @@ function PaperoInstructionsPanel(props: {
           className="h-7 px-2 text-[length:var(--app-font-size-ui-sm,11px)]"
           disabled={!dirty || draft.trim().length === 0}
           onClick={() => {
-            props.onSaveInstructions(props.paperoId, draft.trim());
+            props.onSaveInstructions(definition.id, draft.trim());
           }}
         >
           Save
@@ -137,8 +140,8 @@ export function PaperoPill(props: {
   readonly onSelectPapero: (paperoId: PaperoId) => void;
   readonly onSaveCurrentModelSlot: () => void;
   readonly onClearModelSlot: (provider: ProviderKind) => void;
-  readonly onSaveInstructions: (paperoId: PaperoId, instructions: string) => void;
-  readonly onResetInstructions: (paperoId: PaperoId) => void;
+  readonly onSaveInstructions: (paperoId: PaperoId, instructions: string) => void | Promise<void>;
+  readonly onResetInstructions: (paperoId: PaperoId) => void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [slotsOpen, setSlotsOpen] = useState(false);
@@ -225,7 +228,7 @@ export function PaperoPill(props: {
                 </MenuSubTrigger>
                 <ComposerPickerMenuSubPopup className="p-0">
                   <PaperoInstructionsPanel
-                    paperoId={definition.id}
+                    definition={definition}
                     onSaveInstructions={props.onSaveInstructions}
                     onResetInstructions={props.onResetInstructions}
                   />

@@ -20,6 +20,7 @@ import * as Schema from "effect/Schema";
 import {
   getDefaultModel,
   normalizeModelSlug,
+  providerWithDefaultModel,
   resolveModelSlugForProvider,
   resolveSelectableModel,
 } from "@synara/shared/model";
@@ -209,6 +210,9 @@ export function makeModelSelection(
           ? { options: options as Extract<ModelSelection, { provider: "pi" }>["options"] }
           : {}),
       };
+    // Companion carries no local options: the paired machine owns them.
+    case "astronaut":
+      return { provider, model };
   }
 }
 
@@ -771,8 +775,8 @@ export function resolvePreferredComposerModelSelection(input: {
     (input.projectModelSelection?.provider === preferredProvider
       ? input.projectModelSelection
       : null) ?? {
-      provider: preferredProvider === "pi" ? "codex" : preferredProvider,
-      model: getDefaultModel(preferredProvider === "pi" ? "codex" : preferredProvider),
+      provider: providerWithDefaultModel(preferredProvider),
+      model: getDefaultModel(providerWithDefaultModel(preferredProvider)),
     }
   );
 }

@@ -341,38 +341,50 @@ function availableThreadMentionContextChars(messageText: string): number {
   );
 }
 
-function isUnknownPendingApprovalRequestError(cause: Cause.Cause<ProviderServiceError>): boolean {
+/**
+ * An approval/user-input prompt is answered through a callback that only exists
+ * inside the live provider runtime. Once that runtime is gone — process exit,
+ * session stop, app restart — no retry of the same request can ever land, so
+ * `ProviderService`'s "provider runtime is not active" rejection is as terminal
+ * as the adapter's "unknown pending request". Classifying it as retryable left
+ * the prompt on screen forever: every click failed the same way and the durable
+ * row stayed answerable. See documentation/bugs/2026-08-09-restart-stuck-question-prompt.md.
+ */
+const DEAD_RUNTIME_RESPONSE_DETAIL = "provider runtime is not active";
+
+function causeDetailText(cause: Cause.Cause<ProviderServiceError>): string {
   const error = Cause.squash(cause);
   if (Schema.is(ProviderAdapterRequestError)(error)) {
-    const detail = error.detail.toLowerCase();
-    return (
-      detail.includes("unknown pending approval request") ||
-      detail.includes("unknown pending permission request")
-    );
+    return error.detail.toLowerCase();
   }
-  const message = Cause.pretty(cause);
+  return Cause.pretty(cause).toLowerCase();
+}
+
+function isUnanswerableApprovalRequestError(cause: Cause.Cause<ProviderServiceError>): boolean {
+  const detail = causeDetailText(cause);
   return (
-    message.includes("unknown pending approval request") ||
-    message.includes("unknown pending permission request")
+    detail.includes("unknown pending approval request") ||
+    detail.includes("unknown pending permission request") ||
+    detail.includes(DEAD_RUNTIME_RESPONSE_DETAIL)
   );
 }
 
-function isUnknownPendingUserInputRequestError(cause: Cause.Cause<ProviderServiceError>): boolean {
-  const error = Cause.squash(cause);
-  if (Schema.is(ProviderAdapterRequestError)(error)) {
-    return error.detail.toLowerCase().includes("unknown pending user-input request");
-  }
-  return Cause.pretty(cause).toLowerCase().includes("unknown pending user-input request");
+function isUnanswerableUserInputRequestError(cause: Cause.Cause<ProviderServiceError>): boolean {
+  const detail = causeDetailText(cause);
+  return (
+    detail.includes("unknown pending user-input request") ||
+    detail.includes(DEAD_RUNTIME_RESPONSE_DETAIL)
+  );
 }
 
 function interactionFailureSettlementStatus(
   cause: Cause.Cause<ProviderServiceError>,
-  isUnknownPendingRequest: boolean,
+  isUnanswerableRequest: boolean,
 ): "retryable" | "uncertain" {
   return Option.match(Cause.findErrorOption(cause), {
     onNone: () => "uncertain" as const,
     onSome: (error) =>
-      isUnknownPendingRequest ||
+      isUnanswerableRequest ||
       error._tag === "ProviderAdapterRequestError" ||
       error._tag === "ProviderAdapterProcessError"
         ? ("uncertain" as const)
@@ -2842,13 +2854,13 @@ const make = Effect.gen(function* () {
       .pipe(
         Effect.asVoid,
         Effect.catchCause((cause) => {
-          const unknownPendingRequest = isUnknownPendingApprovalRequestError(cause);
+          const unanswerableRequest = isUnanswerableApprovalRequestError(cause);
           return appendInteractionResponseFailure(event, {
             interactionKind: "approval",
-            detail: unknownPendingRequest
+            detail: unanswerableRequest
               ? buildStalePendingRequestFailureDetail("approval", event.payload.requestId)
               : Cause.pretty(cause),
-            settlementStatus: interactionFailureSettlementStatus(cause, unknownPendingRequest),
+            settlementStatus: interactionFailureSettlementStatus(cause, unanswerableRequest),
           });
         }),
       );
@@ -2876,13 +2888,13 @@ const make = Effect.gen(function* () {
       .pipe(
         Effect.asVoid,
         Effect.catchCause((cause) => {
-          const unknownPendingRequest = isUnknownPendingUserInputRequestError(cause);
+          const unanswerableRequest = isUnanswerableUserInputRequestError(cause);
           return appendInteractionResponseFailure(event, {
             interactionKind: "userInput",
-            detail: unknownPendingRequest
+            detail: unanswerableRequest
               ? buildStalePendingRequestFailureDetail("user-input", event.payload.requestId)
               : Cause.pretty(cause),
-            settlementStatus: interactionFailureSettlementStatus(cause, unknownPendingRequest),
+            settlementStatus: interactionFailureSettlementStatus(cause, unanswerableRequest),
           });
         }),
       );

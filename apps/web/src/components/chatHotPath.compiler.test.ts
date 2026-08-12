@@ -64,33 +64,44 @@ interface HotPathModule {
   // Exact multiset of bailout reasons that are deliberate and reviewed. Anything
   // else — including a second copy of an allowed reason — fails the test.
   readonly allowedBailoutReasons: readonly string[];
+  // Line ceiling. React Compiler memory grows super-linearly with file size, so
+  // these modules — the only ones the compiler is *forced* through here — are
+  // also the ones that can starve a machine. Each number is the file's size when
+  // the ratchet was added; shrinking is free, growing fails the suite. Lower the
+  // number whenever a split lands, never raise it.
+  readonly maxLines: number;
 }
 
 const HOT_PATH_MODULES: readonly HotPathModule[] = [
-  { relativePath: "ChatView.tsx", allowedBailoutReasons: [] },
-  { relativePath: "Sidebar.tsx", allowedBailoutReasons: [] },
+  { relativePath: "ChatView.tsx", allowedBailoutReasons: [], maxLines: 11_737 },
+  { relativePath: "Sidebar.tsx", allowedBailoutReasons: [], maxLines: 6_942 },
   {
     relativePath: "chat/MessagesTimeline.tsx",
     // `useStableRows` deliberately reads and rewrites a previous-state ref inside
     // its memo to reuse row identities across streaming updates. That pattern is
     // documented in place and costs memoization only for that one small hook.
     allowedBailoutReasons: ["Cannot access refs during render"],
+    maxLines: 3_128,
   },
-  { relativePath: "chat/TimelineWorkEntryRow.tsx", allowedBailoutReasons: [] },
-  { relativePath: "chat/ChatTranscriptPane.tsx", allowedBailoutReasons: [] },
+  { relativePath: "chat/TimelineWorkEntryRow.tsx", allowedBailoutReasons: [], maxLines: 995 },
+  { relativePath: "chat/ChatTranscriptPane.tsx", allowedBailoutReasons: [], maxLines: 316 },
   // The composer surface: these three render or re-render on keystrokes while a
   // picker or the slash-command menu is open.
-  { relativePath: "chat/ComposerCommandMenu.tsx", allowedBailoutReasons: [] },
-  { relativePath: "chat/TraitsPicker.tsx", allowedBailoutReasons: [] },
-  { relativePath: "chat/ProjectPicker.tsx", allowedBailoutReasons: [] },
+  { relativePath: "chat/ComposerCommandMenu.tsx", allowedBailoutReasons: [], maxLines: 599 },
+  { relativePath: "chat/TraitsPicker.tsx", allowedBailoutReasons: [], maxLines: 670 },
+  { relativePath: "chat/ProjectPicker.tsx", allowedBailoutReasons: [], maxLines: 668 },
   // Not chat-specific, but rendered inside every message row and sidebar row.
-  { relativePath: "ui/button.tsx", allowedBailoutReasons: [] },
+  { relativePath: "ui/button.tsx", allowedBailoutReasons: [], maxLines: 157 },
   // Hooks called from the chat and sidebar render paths. A bailing hook does not
   // stop its caller from compiling, but it does lose its own memoization, and
   // these run on every composer keystroke and every sidebar action.
-  { relativePath: "../hooks/useComposerSlashCommands.ts", allowedBailoutReasons: [] },
-  { relativePath: "../hooks/useLocalStorage.ts", allowedBailoutReasons: [] },
-  { relativePath: "../hooks/useSidebarThreadActions.ts", allowedBailoutReasons: [] },
+  {
+    relativePath: "../hooks/useComposerSlashCommands.ts",
+    allowedBailoutReasons: [],
+    maxLines: 1_025,
+  },
+  { relativePath: "../hooks/useLocalStorage.ts", allowedBailoutReasons: [], maxLines: 164 },
+  { relativePath: "../hooks/useSidebarThreadActions.ts", allowedBailoutReasons: [], maxLines: 925 },
 ];
 
 /**
@@ -117,5 +128,26 @@ describe("chat hot-path React Compiler coverage", () => {
       },
       COMPILE_TIMEOUT_MS,
     );
+  }
+});
+
+// Separate suite: this one only counts lines, so it stays fast and reports a
+// size regression without waiting on the minutes-long compile above.
+describe("chat hot-path size ratchet", () => {
+  for (const module of HOT_PATH_MODULES) {
+    it(`keeps ${module.relativePath} within its line budget`, () => {
+      const source = readFileSync(join(import.meta.dirname, module.relativePath), "utf8");
+      // Counted the way `wc -l` does, so the budgets stay comparable to what a
+      // shell reports: a trailing newline does not add a phantom last line.
+      const lineCount = source.split("\n").length - (source.endsWith("\n") ? 1 : 0);
+
+      expect(
+        lineCount,
+        `${module.relativePath} grew to ${lineCount} lines (budget ${module.maxLines}). ` +
+          "These modules are fed to React Compiler, whose memory use grows faster than " +
+          "file size. Extract something instead of raising the budget; if the file did " +
+          "shrink, lower maxLines to the new size.",
+      ).toBeLessThanOrEqual(module.maxLines);
+    });
   }
 });

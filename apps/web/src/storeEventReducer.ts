@@ -15,6 +15,7 @@ import {
   setPinnedMessageLabel,
 } from "@synara/shared/pinnedMessages";
 import { isPendingInteractionResponseClaimable } from "@synara/shared/pendingInteractions";
+import { isStalePendingRequestFailureDetail } from "@synara/shared/threadSummary";
 import {
   addThreadMarker,
   removeThreadMarker,
@@ -182,7 +183,28 @@ function reconcilePendingInteractionsFromActivity(
   ) {
     const responseCommandId = payload?.responseCommandId;
     if (typeof responseCommandId !== "string" || responseCommandId.length === 0) {
-      return pendingInteractions;
+      // Reconciliation (session restart) reports orphaned requests with no
+      // claiming response command. The server projection settles these as
+      // `uncertain`; mirror it here or the client keeps the row `pending` until
+      // the next full snapshot, which keeps `activePendingApproval` set and
+      // silently swallows every queued composer message in the meantime.
+      const detail = payload?.detail;
+      if (!isStalePendingRequestFailureDetail(typeof detail === "string" ? detail : undefined)) {
+        return pendingInteractions;
+      }
+      let settled = false;
+      const settledNext = existing.map((interaction) => {
+        if (
+          !matchesIdentity(interaction) ||
+          interaction.status === "confirmed" ||
+          interaction.status === "uncertain"
+        ) {
+          return interaction;
+        }
+        settled = true;
+        return { ...interaction, status: "uncertain" as const, resolvedAt: null };
+      });
+      return settled ? settledNext : pendingInteractions;
     }
     const settlementStatus: OrchestrationPendingInteraction["status"] =
       payload?.settlementStatus === "retryable" ? "retryable" : "uncertain";

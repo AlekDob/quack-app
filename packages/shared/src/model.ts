@@ -34,6 +34,8 @@ const MODEL_SLUG_SET_BY_PROVIDER: Record<ProviderKind, ReadonlySet<ModelSlug>> =
   kilo: new Set(MODEL_OPTIONS_BY_PROVIDER.kilo.map((option) => option.slug)),
   opencode: new Set(MODEL_OPTIONS_BY_PROVIDER.opencode.map((option) => option.slug)),
   pi: new Set<ModelSlug>(),
+  // Companion's catalogue lives on the paired machine, reported over /status.
+  astronaut: new Set<ModelSlug>(),
 };
 
 export interface SelectableModelOption {
@@ -60,8 +62,18 @@ export function getModelOptions(provider: ProviderKind = "codex") {
   return MODEL_OPTIONS_BY_PROVIDER[provider];
 }
 
-function hasDefaultModel(provider: ProviderKind): provider is ProviderWithDefaultModel {
-  return provider !== "pi";
+// Pi discovers its catalogue and Companion's lives on the paired machine, so
+// neither has a hardcoded default slug to fall back on.
+export function hasDefaultModel(provider: ProviderKind): provider is ProviderWithDefaultModel {
+  return provider !== "pi" && provider !== "astronaut";
+}
+
+/**
+ * Codex fallback for the providers that discover their catalogue at runtime.
+ * Use where a concrete default slug is required before the catalogue is known.
+ */
+export function providerWithDefaultModel(provider: ProviderKind): ProviderWithDefaultModel {
+  return hasDefaultModel(provider) ? provider : "codex";
 }
 
 export function getDefaultModel(provider: "pi"): null;
@@ -495,7 +507,7 @@ export function resolveModelSlug(
   provider: ProviderKind = "codex",
 ): ModelSlug | null {
   const normalized = normalizeModelSlug(model, provider);
-  if (provider === "pi") {
+  if (!hasDefaultModel(provider)) {
     return normalized;
   }
   if (!normalized) {

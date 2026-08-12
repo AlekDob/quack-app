@@ -28,11 +28,13 @@ import {
 } from "./codexProcessEnv";
 import {
   buildCodexInitializeParams,
+  buildCodexThreadOpenRequest,
   CODEX_DEFAULT_MODE_DEVELOPER_INSTRUCTIONS,
   CODEX_PLAN_MODE_DEVELOPER_INSTRUCTIONS,
   __codexCliVersionGateTesting,
   CodexAppServerManager,
   classifyCodexStderrLine,
+  formatCodexThreadResumeError,
   isRecoverableThreadResumeError,
   normalizeCodexModelSlug,
   readCodexAccountSnapshot,
@@ -1383,6 +1385,84 @@ describe("isRecoverableThreadResumeError", () => {
         new Error("thread/resume failed: timed out waiting for server"),
       ),
     ).toBe(false);
+  });
+});
+
+describe("buildCodexThreadOpenRequest", () => {
+  const sessionOverrides = {
+    model: null,
+    cwd: "/tmp/project",
+    approvalPolicy: "never" as const,
+    approvalsReviewer: "user" as const,
+    sandbox: "danger-full-access" as const,
+  };
+
+  it("forks an external thread into a new provider-owned thread", () => {
+    expect(
+      buildCodexThreadOpenRequest({
+        forkSourceThreadId: "external-thread",
+        sessionOverrides,
+      }),
+    ).toEqual({
+      method: "thread/fork",
+      params: {
+        ...sessionOverrides,
+        threadId: "external-thread",
+      },
+    });
+  });
+
+  it("resumes an existing provider thread without start-only options", () => {
+    expect(
+      buildCodexThreadOpenRequest({
+        resumeThreadId: "existing-thread",
+        sessionOverrides,
+      }),
+    ).toEqual({
+      method: "thread/resume",
+      params: {
+        ...sessionOverrides,
+        threadId: "existing-thread",
+      },
+    });
+  });
+
+  it("starts a fresh thread with raw events disabled", () => {
+    expect(buildCodexThreadOpenRequest({ sessionOverrides })).toEqual({
+      method: "thread/start",
+      params: {
+        ...sessionOverrides,
+        experimentalRawEvents: false,
+      },
+    });
+  });
+
+  it("rejects conflicting resume and fork sources", () => {
+    expect(() =>
+      buildCodexThreadOpenRequest({
+        forkSourceThreadId: "fork-source",
+        resumeThreadId: "resume-source",
+        sessionOverrides,
+      }),
+    ).toThrow("cannot resume and fork at the same time");
+  });
+});
+
+describe("formatCodexThreadResumeError", () => {
+  it("explains how to resolve an active writer conflict", () => {
+    const formatted = formatCodexThreadResumeError(
+      new Error("thread/resume failed: thread external-thread already has an active writer"),
+      "external-thread",
+    );
+
+    expect(formatted.message).toBe(
+      "Codex thread external-thread is open in another Codex client. Close that client before continuing the original thread, or import it as a copy instead.",
+    );
+  });
+
+  it("preserves unrelated resume errors", () => {
+    const original = new Error("thread/resume failed: permission denied");
+    expect(formatCodexThreadResumeError(original, "external-thread")).toBe(original);
   });
 });
 
@@ -2929,6 +3009,56 @@ describe("thread checkpoint control", () => {
 });
 
 describe("respondToRequest", () => {
+  it("keeps a plugin-install elicitation pending and accepts it with the MCP response shape", async () => {
+    const { manager, context, writeMessage, emitEvent } = createPendingApprovalHarness();
+    context.sessionApprovalOverride = fullAccessTurnOverrides;
+
+    await handleServerRequestForTest(manager, context, {
+      id: 77,
+      method: "mcpServer/elicitation/request",
+      params: {
+        threadId: "thread_1",
+        turnId: "turn_1",
+        mode: "form",
+        message: "Install Linear to manage issues.",
+        requestedSchema: { type: "object", properties: {} },
+        _meta: {
+          codex_approval_kind: "tool_suggestion",
+          tool_type: "plugin",
+          suggest_type: "install",
+          tool_name: "Linear",
+        },
+      },
+    });
+
+    const [requestId, pending] =
+      Array.from(context.pendingApprovals.entries()).find(
+        ([, request]) =>
+          (request as { readonly method: string }).method === "mcpServer/elicitation/request",
+      ) ?? [];
+    expect(requestId).toBeDefined();
+    expect(pending).toEqual(
+      expect.objectContaining({
+        method: "mcpServer/elicitation/request",
+        requestKind: "plugin-install",
+      }),
+    );
+    expect(writeMessage).not.toHaveBeenCalled();
+
+    await manager.respondToRequest(asThreadId("thread_1"), requestId!, "accept");
+
+    expect(writeMessage).toHaveBeenLastCalledWith(context, {
+      id: 77,
+      result: { action: "accept", content: {} },
+    });
+    expect(emitEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        method: "item/requestApproval/decision",
+        requestKind: "plugin-install",
+      }),
+    );
+  });
+
   it("keeps acceptForSession active for later Codex turns", async () => {
     const { manager, context, requireSession, writeMessage, emitEvent, sendRequest } =
       createPendingApprovalHarness();

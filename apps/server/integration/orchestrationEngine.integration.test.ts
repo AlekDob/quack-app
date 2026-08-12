@@ -13,6 +13,7 @@ import {
   ThreadId,
   ModelSelection,
 } from "@synara/contracts";
+import { hasDefaultModel } from "@synara/shared/model";
 import { assert, it } from "@effect/vitest";
 import { Effect, Option, Schema } from "effect";
 
@@ -122,8 +123,8 @@ const seedProjectAndThread = (harness: OrchestrationIntegrationHarness) =>
   Effect.gen(function* () {
     const createdAt = nowIso();
     const provider = harness.adapterHarness?.provider ?? "codex";
-    if (provider === "pi") {
-      throw new Error("Pi integration tests require an explicit model selection.");
+    if (!hasDefaultModel(provider)) {
+      throw new Error(`${provider} integration tests require an explicit model selection.`);
     }
     const defaultModel = DEFAULT_MODEL_BY_PROVIDER[provider];
 

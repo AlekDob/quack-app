@@ -1919,7 +1919,8 @@ function extractWorkLogRequestKind(
     payload?.requestKind === "command" ||
     payload?.requestKind === "file-read" ||
     payload?.requestKind === "file-change" ||
-    payload?.requestKind === "permissions"
+    payload?.requestKind === "permissions" ||
+    payload?.requestKind === "plugin-install"
   ) {
     return payload.requestKind;
   }

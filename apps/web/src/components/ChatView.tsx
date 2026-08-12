@@ -1,43 +1,31 @@
 import {
   type AutomationDefinition,
-  type AutomationSchedule,
   type ApprovalRequestId,
   COMPOSER_EFFORT_KEYBINDING_COMMANDS,
   DEFAULT_MODEL_BY_PROVIDER,
   EventId,
   MessageId,
   type ModelSelection,
-  type NativeApi,
-  type OrchestrationShellSnapshot,
   type ProjectScript,
   type ModelSlug,
   type ProviderKind,
-  type ProjectEntry,
   type ProjectId,
   type TeamScope,
   type ProviderApprovalDecision,
   PROVIDER_DISPLAY_NAMES,
   type ProviderMentionReference,
-  type ProviderNativeCommandDescriptor,
-  type ProviderPluginDescriptor,
   type ProviderRequestKind,
-  type ProviderSkillDescriptor,
   type ProviderSkillReference,
   type ProviderStartOptions,
   type ProviderUserInputAnswers,
-  type PinnedMessage,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
-  type ResolvedKeybindingsConfig,
-  type ServerProviderStatus,
   ThreadId,
   ThreadMarkerId,
   type ThreadMarker,
   type ThreadMarkerColor,
   type ThreadMarkerStyle,
   type TurnId,
-  type EditorId,
   type KeybindingCommand,
-  OrchestrationThreadActivity,
   ProviderInteractionMode,
   RuntimeMode,
 } from "@synara/contracts";
@@ -114,7 +102,6 @@ import { getLocalFolderBrowseRootPath, isLocalFolderMentionQuery } from "~/lib/l
 import {
   findProviderStatus,
   isProviderUsable,
-  normalizeCustomBinaryPath,
   normalizeProviderStatusForLocalConfig,
   resolveProviderSendAvailabilityWithRefresh,
 } from "~/lib/providerAvailability";
@@ -141,6 +128,10 @@ import {
   type BrowserPromptAttachmentResolution,
 } from "../lib/browserPromptContext";
 import {
+  maybeResolveDevicePromptAttachment,
+  type DevicePromptAttachmentResolution,
+} from "../lib/devicePromptContext";
+import {
   buildComposerFileAttachmentsFromFiles,
   stageUploadComposerAttachments,
   cloneComposerImageAttachment,
@@ -150,7 +141,6 @@ import {
   hydratePendingBlobComposerAttachments,
   readFileAsDataUrl,
 } from "../lib/composerSend";
-import { composerImageBlobKey, persistComposerImageBlob } from "../lib/composerImageBlobStore";
 import { reconcileDeletedThreadFromClient } from "../lib/deletedThreadClientReconciliation";
 import { extractChatAutomationInvocation } from "../lib/automationIntent";
 import {
@@ -169,6 +159,7 @@ import { useHandleNewChat } from "../hooks/useHandleNewChat";
 import { splitComposerDropzoneFiles, useComposerDropzone } from "../hooks/useComposerDropzone";
 import { useComposerImageIntake } from "../hooks/useComposerImageIntake";
 import { useDiffRouteSearch } from "../hooks/useDiffRouteSearch";
+import { useSustainedFlag } from "../hooks/useSustainedFlag";
 import {
   buildThreadBreadcrumbs,
   buildTranscriptAutoFollowSignal,
@@ -184,6 +175,7 @@ import {
   resolveActiveThreadTitle,
   resolveActiveTurnLiveDiffState,
   resolveCommittedProviderModel,
+  resolveComposerStripWorkLogEntries,
   resolveCycledModelSlug,
   resolveDefaultEnvironmentPanelOpen,
   resolveEnvironmentPanelOpen,
@@ -198,6 +190,49 @@ import {
   shouldEnableComposerPastedTextCollapse,
   shouldConsumePendingCustomBinaryConfirmation,
   shouldShowComposerModelBootstrapSkeleton,
+} from "./ChatView.logic";
+import {
+  ATTACHMENT_PREVIEW_HANDOFF_TTL_MS,
+  automationScheduleActivityPayload,
+  buildQueuedComposerPreviewText,
+  canHandleComposerPickerShortcut,
+  COMPOSER_PATH_QUERY_DEBOUNCE_MS,
+  composerPromptStillMatchesRestoredQueuedDraft,
+  EMPTY_ACTIVITIES,
+  EMPTY_AVAILABLE_EDITORS,
+  EMPTY_COMPOSER_PLUGIN_SUGGESTIONS,
+  EMPTY_DISMISSED_PROVIDER_HEALTH_BANNERS,
+  EMPTY_KEYBINDINGS,
+  EMPTY_LAST_INVOKED_SCRIPT_BY_PROJECT,
+  EMPTY_MESSAGES,
+  EMPTY_PAPERO_MODEL_MAP,
+  EMPTY_PENDING_USER_INPUT_ANSWERS,
+  EMPTY_PINNED_MESSAGES,
+  EMPTY_PINNED_TEXT,
+  EMPTY_PROJECT_ENTRIES,
+  EMPTY_PROVIDER_NATIVE_COMMANDS,
+  EMPTY_PROVIDER_SKILLS,
+  EMPTY_PROVIDER_STATUSES,
+  EMPTY_TERMINAL_RUNTIME_ENV,
+  EMPTY_THREAD_MARKERS,
+  eventTargetsComposer,
+  formatPastedTextTitleSeed,
+  getConfirmedCustomBinarySessionKey,
+  getProviderHealthBannerDismissalKey,
+  getProviderStartOptionsCustomBinaryPath,
+  getRateLimitBannerDismissalKey,
+  getThreadProviderCustomBinaryPathKey,
+  LOCAL_PROJECT_DRAFT_CONTEXT,
+  makeAutomationSetupBubble,
+  MAX_DISMISSED_PROVIDER_HEALTH_BANNERS,
+  readPaperoIdForSend,
+  revokeBlobPreviewUrlsAfterPaint,
+  RUNNING_WITHOUT_ACTIVE_TURN_QUEUE_GRACE_MS,
+  stagePersistedComposerImageAttachments,
+  VOICE_RECORDER_ACTION_ARM_DELAY_MS,
+  waitForSetupScriptTerminalActivity,
+  waitForShellProjectById,
+  warnVoiceGuard,
 } from "./ChatView.logic";
 import {
   createRelevantWorkLogThreadsSelector,
@@ -332,20 +367,25 @@ import {
   type ProjectScriptRunResult,
 } from "~/projectScripts";
 import { runProjectCommandInTerminal } from "~/projectTerminalRunner";
+import {
+  CLAUDE_AUTH_LOGIN_COMMAND,
+  CLAUDE_AUTHENTICATION_FAILED_MESSAGE,
+  isClaudeAuthenticationFailedError,
+} from "~/lib/claudeAuthRecovery";
 import { newCommandId, newMessageId, newProjectId, newThreadId } from "~/lib/utils";
 import { ensureNativeApi, readNativeApi } from "~/nativeApi";
 import { promoteThreadCreate } from "~/lib/threadCreatePromotion";
 import { readFavoriteModelSlugs } from "~/lib/modelFavorites";
-import { composerPaperiFromRoster, GLOBAL_TEAM_SCOPE, teamRosterQueryKey } from "~/lib/teamRoster";
-import { usePaperoStore } from "~/paperi";
 import {
-  DEFAULT_PAPERO_ID,
-  getPaperoDefinition,
-  resolveCycledPaperoId,
-  type PaperoId,
-} from "@synara/shared/paperi";
+  composerPaperiFromRoster,
+  GLOBAL_TEAM_SCOPE,
+  paperoResolverFromRoster,
+  teamRosterQueryKey,
+  useSaveTeamAgentInstructions,
+} from "~/lib/teamRoster";
+import { usePaperoStore } from "~/paperi";
+import { DEFAULT_PAPERO_ID, resolveCycledPaperoId, type PaperoId } from "@synara/shared/paperi";
 
-const EMPTY_PAPERO_MODEL_MAP: Partial<Record<ProviderKind, ModelSelection>> = Object.freeze({});
 import {
   getCustomBinaryPathForProvider,
   getProviderStartOptions,
@@ -362,7 +402,6 @@ import {
   type ComposerAssistantSelectionAttachment,
   type BrowserAnnotationDraft,
   type DraftThreadEnvMode,
-  type PersistedComposerImageAttachment,
   type QueuedComposerChatTurn,
   type QueuedComposerPlanFollowUp,
   type QueuedComposerTurn,
@@ -392,12 +431,10 @@ import {
 import {
   appendPastedTextsToPrompt,
   createPastedTextDraft,
-  pastedTextTitle,
   type PastedTextDraft,
 } from "../lib/composerPastedText";
 import {
   appendAssistantSelectionsToPrompt,
-  formatAssistantSelectionQueuePreview,
   formatAssistantSelectionTitleSeed,
 } from "../lib/assistantSelections";
 import {
@@ -406,7 +443,6 @@ import {
 } from "../lib/browserAnnotations";
 import {
   appendFileCommentsToPrompt,
-  formatFileCommentLabel,
   formatFileCommentTitleSeed,
   type FileCommentDraft,
 } from "../lib/fileComments";
@@ -422,7 +458,7 @@ import {
   resolveNextComposerFooterTier,
   shouldUseCompactComposerFooter,
 } from "./composerFooterLayout";
-import { selectThreadTerminalState, useTerminalStateStore } from "../terminalStateStore";
+import { useTerminalStateStore } from "../terminalStateStore";
 import {
   resolveSplitViewFocusedThreadId,
   selectSplitView,
@@ -432,6 +468,7 @@ import {
 import { ComposerPromptEditor, type ComposerPromptEditorHandle } from "./ComposerPromptEditor";
 import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 import { ChatHeader } from "./chat/ChatHeader";
+import { PaperoIdentityContext } from "./chat/paperoIdentityContext";
 import { dispatchThreadNotes } from "~/pinnedMessages";
 import {
   mergeProjectInstructionsIntoThreadNotes,
@@ -550,11 +587,7 @@ import { ProjectPicker } from "./chat/ProjectPicker";
 import { FolderClosed } from "./FolderClosed";
 import { ProviderHealthBanner } from "./chat/ProviderHealthBanner";
 import { ThreadErrorBanner } from "./chat/ThreadErrorBanner";
-import {
-  RateLimitBanner,
-  deriveLatestRateLimitStatus,
-  type RateLimitStatus,
-} from "./chat/RateLimitBanner";
+import { RateLimitBanner, deriveLatestRateLimitStatus } from "./chat/RateLimitBanner";
 import {
   ACTIVE_TURN_LAYOUT_SETTLE_DELAY_MS,
   appendVoiceTranscriptToPrompt,
@@ -582,6 +615,7 @@ import {
   shouldRenderProviderHealthBanner,
   resolveRuntimeModeAfterApprovalDecision,
   revokeBlobPreviewUrl,
+  savePaperoInstructionsFailure,
   revokeUserMessagePreviewUrls,
 } from "./ChatView.logic";
 import { useLocalStorage } from "~/hooks/useLocalStorage";
@@ -608,428 +642,6 @@ import { resolveProjectDefaultModelSelection } from "../lib/projectDefaultProvid
 // are conditional, so loading it lazily keeps the terminal stack out of the initial
 // chat bundle and defers the cost to the first time a terminal is actually opened.
 const ThreadTerminalDrawer = lazy(() => import("./ThreadTerminalDrawer"));
-
-const ATTACHMENT_PREVIEW_HANDOFF_TTL_MS = 5000;
-const EMPTY_ACTIVITIES: OrchestrationThreadActivity[] = [];
-const EMPTY_MESSAGES: ChatMessage[] = [];
-const EMPTY_PINNED_MESSAGES: readonly PinnedMessage[] = [];
-const EMPTY_THREAD_MARKERS: readonly ThreadMarker[] = [];
-const EMPTY_PINNED_TEXT: ReadonlyMap<MessageId, string> = new Map();
-const EMPTY_KEYBINDINGS: ResolvedKeybindingsConfig = [];
-const EMPTY_PROJECT_ENTRIES: ProjectEntry[] = [];
-const EMPTY_PROVIDER_NATIVE_COMMANDS: ProviderNativeCommandDescriptor[] = [];
-const EMPTY_PROVIDER_SKILLS: ProviderSkillDescriptor[] = [];
-const LOCAL_PROJECT_DRAFT_CONTEXT = {
-  envMode: "local",
-  worktreePath: null,
-  branch: null,
-  lastKnownPr: null,
-} as const;
-const DRAFT_PROJECT_SYNC_MAX_ATTEMPTS = 6;
-const DRAFT_PROJECT_SYNC_DELAY_MS = 50;
-const SETUP_SCRIPT_TERMINAL_ACTIVITY_START_TIMEOUT_MS = 1_000;
-const SETUP_SCRIPT_TERMINAL_MAX_RUNTIME_MS = 10 * 60 * 1000;
-
-function terminalHasRunningSubprocess(threadId: ThreadId, terminalId: string): boolean {
-  const terminalState = selectThreadTerminalState(
-    useTerminalStateStore.getState().terminalStateByThreadId,
-    threadId,
-  );
-  return terminalState.runningTerminalIds.includes(terminalId);
-}
-
-function waitForSetupScriptTerminalActivity(input: {
-  threadId: ThreadId;
-  terminalId: string;
-  observeStartTimeoutMs?: number;
-  maxRuntimeMs?: number;
-}): Promise<void> {
-  if (typeof window === "undefined") {
-    return Promise.resolve();
-  }
-
-  const observeStartTimeoutMs =
-    input.observeStartTimeoutMs ?? SETUP_SCRIPT_TERMINAL_ACTIVITY_START_TIMEOUT_MS;
-  const maxRuntimeMs = input.maxRuntimeMs ?? SETUP_SCRIPT_TERMINAL_MAX_RUNTIME_MS;
-
-  return new Promise((resolve) => {
-    let resolved = false;
-    let observedRunning = terminalHasRunningSubprocess(input.threadId, input.terminalId);
-    let observeStartTimer: number | null = null;
-    let maxRuntimeTimer: number | null = null;
-
-    const unsubscribe = useTerminalStateStore.subscribe(() => {
-      checkRunningState();
-    });
-
-    const clearTimers = () => {
-      if (observeStartTimer !== null) {
-        window.clearTimeout(observeStartTimer);
-        observeStartTimer = null;
-      }
-      if (maxRuntimeTimer !== null) {
-        window.clearTimeout(maxRuntimeTimer);
-        maxRuntimeTimer = null;
-      }
-    };
-
-    const finish = () => {
-      if (resolved) return;
-      resolved = true;
-      clearTimers();
-      unsubscribe();
-      resolve();
-    };
-
-    const ensureMaxRuntimeTimer = () => {
-      if (maxRuntimeTimer !== null) return;
-      maxRuntimeTimer = window.setTimeout(finish, maxRuntimeMs);
-    };
-
-    function checkRunningState() {
-      const running = terminalHasRunningSubprocess(input.threadId, input.terminalId);
-      if (running) {
-        observedRunning = true;
-        if (observeStartTimer !== null) {
-          window.clearTimeout(observeStartTimer);
-          observeStartTimer = null;
-        }
-        ensureMaxRuntimeTimer();
-        return;
-      }
-      if (observedRunning) {
-        finish();
-      }
-    }
-
-    checkRunningState();
-    if (!observedRunning) {
-      observeStartTimer = window.setTimeout(finish, observeStartTimeoutMs);
-    }
-  });
-}
-
-function waitForDraftProjectSyncDelay(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-}
-
-// Waits for a project to appear in the shell snapshot before a local draft points at it.
-async function waitForShellProjectById(
-  api: NativeApi,
-  projectId: ProjectId,
-): Promise<{
-  project: OrchestrationShellSnapshot["projects"][number] | null;
-  snapshot: OrchestrationShellSnapshot | null;
-}> {
-  let latestSnapshot: OrchestrationShellSnapshot | null = null;
-  for (let attempt = 1; attempt <= DRAFT_PROJECT_SYNC_MAX_ATTEMPTS; attempt += 1) {
-    const snapshot = await api.orchestration.getShellSnapshot().catch(() => null);
-    if (snapshot) {
-      latestSnapshot = snapshot;
-      const project = snapshot.projects.find((candidate) => candidate.id === projectId) ?? null;
-      if (project) {
-        return { project, snapshot };
-      }
-    }
-    if (attempt < DRAFT_PROJECT_SYNC_MAX_ATTEMPTS) {
-      await waitForDraftProjectSyncDelay(DRAFT_PROJECT_SYNC_DELAY_MS * attempt);
-    }
-  }
-  return { project: null, snapshot: latestSnapshot };
-}
-
-function automationScheduleActivityPayload(schedule: AutomationSchedule) {
-  switch (schedule.type) {
-    case "manual":
-      return { type: "manual" } as const;
-    case "once":
-      return { type: "once", runAt: schedule.runAt } as const;
-    case "interval":
-      return { type: "interval", everySeconds: schedule.everySeconds } as const;
-    case "daily":
-      return schedule.timezone
-        ? { type: "daily", timeOfDay: schedule.timeOfDay, timezone: schedule.timezone }
-        : { type: "daily", timeOfDay: schedule.timeOfDay };
-    case "weekdays":
-      return schedule.timezone
-        ? { type: "weekdays", timeOfDay: schedule.timeOfDay, timezone: schedule.timezone }
-        : { type: "weekdays", timeOfDay: schedule.timeOfDay };
-    case "weekly":
-      return schedule.timezone
-        ? {
-            type: "weekly",
-            dayOfWeek: schedule.dayOfWeek,
-            timeOfDay: schedule.timeOfDay,
-            timezone: schedule.timezone,
-          }
-        : {
-            type: "weekly",
-            dayOfWeek: schedule.dayOfWeek,
-            timeOfDay: schedule.timeOfDay,
-          };
-    case "cron":
-      return {
-        type: "cron",
-        expression: schedule.expression,
-        timezone: schedule.timezone,
-      } as const;
-  }
-}
-
-function revokeBlobPreviewUrlsAfterPaint(previewUrls: readonly string[]): void {
-  if (previewUrls.length === 0 || typeof window === "undefined") {
-    return;
-  }
-  window.requestAnimationFrame(() => {
-    window.setTimeout(() => {
-      for (const previewUrl of previewUrls) {
-        revokeBlobPreviewUrl(previewUrl);
-      }
-    }, 0);
-  });
-}
-
-// Shared by the live-composer and prompt-history attachment sync effects:
-// AppSnap images persist their bytes as IndexedDB blobs (reusing an existing
-// blob key when valid), everything else inlines a data URL. Falls back to the
-// already-persisted attachments for images whose serialization fails.
-async function stagePersistedComposerImageAttachments(input: {
-  threadId: ThreadId;
-  images: ReadonlyArray<ComposerImageAttachment>;
-  getPersistedAttachments: () => PersistedComposerImageAttachment[];
-}): Promise<PersistedComposerImageAttachment[]> {
-  try {
-    const existingPersistedById = new Map(
-      input.getPersistedAttachments().map((attachment) => [attachment.id, attachment]),
-    );
-    const stagedAttachmentById = new Map<string, PersistedComposerImageAttachment>();
-    await Promise.all(
-      input.images.map(async (image) => {
-        try {
-          if (image.source?.kind === "appsnap") {
-            const existingPersisted = existingPersistedById.get(image.id);
-            const expectedBlobKey = composerImageBlobKey(input.threadId, image.id);
-            const blobKey =
-              existingPersisted?.blobKey === expectedBlobKey
-                ? expectedBlobKey
-                : await persistComposerImageBlob({
-                    threadId: input.threadId,
-                    imageId: image.id,
-                    file: image.file,
-                  });
-            stagedAttachmentById.set(image.id, {
-              id: image.id,
-              name: image.name,
-              mimeType: image.mimeType,
-              sizeBytes: image.sizeBytes,
-              blobKey,
-              source: image.source,
-            });
-            return;
-          }
-          const dataUrl = await readFileAsDataUrl(image.file);
-          stagedAttachmentById.set(image.id, {
-            id: image.id,
-            name: image.name,
-            mimeType: image.mimeType,
-            sizeBytes: image.sizeBytes,
-            dataUrl,
-          });
-        } catch {
-          const existingPersisted = existingPersistedById.get(image.id);
-          if (existingPersisted) {
-            stagedAttachmentById.set(image.id, existingPersisted);
-          }
-        }
-      }),
-    );
-    return Array.from(stagedAttachmentById.values());
-  } catch {
-    const currentImageIds = new Set(input.images.map((image) => image.id));
-    return input
-      .getPersistedAttachments()
-      .filter((attachment) => currentImageIds.has(attachment.id));
-  }
-}
-
-function eventTargetsComposer(
-  event: globalThis.KeyboardEvent,
-  composerForm: HTMLFormElement | null,
-): boolean {
-  if (!composerForm) return false;
-  const target = event.target;
-  return target instanceof Node ? composerForm.contains(target) : false;
-}
-
-function canHandleComposerPickerShortcut(
-  event: globalThis.KeyboardEvent,
-  composerForm: HTMLFormElement | null,
-): boolean {
-  if (!composerForm) return false;
-  if (eventTargetsComposer(event, composerForm)) return true;
-  const target = event.target;
-  return (
-    target === document.body ||
-    target === document.documentElement ||
-    document.activeElement === document.body ||
-    document.activeElement === document.documentElement
-  );
-}
-const EMPTY_AVAILABLE_EDITORS: EditorId[] = [];
-const EMPTY_PROVIDER_STATUSES: ServerProviderStatus[] = [];
-const EMPTY_PENDING_USER_INPUT_ANSWERS: Record<string, PendingUserInputDraftAnswer> = {};
-const EMPTY_TERMINAL_RUNTIME_ENV: Record<string, string> = {};
-const MAX_DISMISSED_PROVIDER_HEALTH_BANNERS = 50;
-const EMPTY_LAST_INVOKED_SCRIPT_BY_PROJECT: Record<string, string> = {};
-const EMPTY_DISMISSED_PROVIDER_HEALTH_BANNERS: ReadonlyArray<string> = [];
-
-function getThreadProviderCustomBinaryPathKey(threadId: Thread["id"], provider: ProviderKind) {
-  return `${threadId}:${provider}`;
-}
-
-function getConfirmedCustomBinarySessionKey(
-  thread: Thread | null | undefined,
-  provider: ProviderKind,
-): string | null {
-  const session = thread?.session;
-  if (!thread || session?.provider !== provider) {
-    return null;
-  }
-  if (session.status !== "ready" && session.status !== "running") {
-    return null;
-  }
-  return getThreadProviderCustomBinaryPathKey(thread.id, provider);
-}
-
-function getProviderStartOptionsCustomBinaryPath(
-  providerOptions: ProviderStartOptions | undefined,
-  provider: ProviderKind,
-): string | null {
-  switch (provider) {
-    case "codex":
-      return normalizeCustomBinaryPath(providerOptions?.codex?.binaryPath);
-    case "claudeAgent":
-      return normalizeCustomBinaryPath(providerOptions?.claudeAgent?.binaryPath);
-    case "antigravity":
-      return normalizeCustomBinaryPath(providerOptions?.antigravity?.binaryPath);
-    case "grok":
-      return normalizeCustomBinaryPath(providerOptions?.grok?.binaryPath);
-    case "droid":
-      return normalizeCustomBinaryPath(providerOptions?.droid?.binaryPath);
-    case "kilo":
-      return normalizeCustomBinaryPath(providerOptions?.kilo?.binaryPath);
-    case "opencode":
-      return normalizeCustomBinaryPath(providerOptions?.opencode?.binaryPath);
-    case "cursor":
-      return normalizeCustomBinaryPath(providerOptions?.cursor?.binaryPath);
-    case "pi":
-      return normalizeCustomBinaryPath(providerOptions?.pi?.binaryPath);
-  }
-}
-
-function getProviderHealthBannerDismissalKey(status: ServerProviderStatus | null): string | null {
-  if (!status || status.status === "ready") {
-    return null;
-  }
-  return [
-    status.provider,
-    status.status,
-    status.available ? "available" : "unavailable",
-    status.authStatus,
-    status.message?.trim() ?? "",
-  ].join("\u001f");
-}
-
-function getRateLimitBannerDismissalKey(
-  status: RateLimitStatus | null,
-  threadId: Thread["id"] | null,
-): string | null {
-  if (!status || !threadId) {
-    return null;
-  }
-  return [
-    threadId,
-    status.status,
-    status.resetsAt ?? "",
-    typeof status.utilization === "number" ? String(Math.round(status.utilization * 100)) : "",
-  ].join("\u001f");
-}
-
-type ComposerPluginSuggestion = {
-  plugin: ProviderPluginDescriptor;
-  mention: ProviderMentionReference;
-};
-
-const EMPTY_COMPOSER_PLUGIN_SUGGESTIONS: ComposerPluginSuggestion[] = [];
-
-function buildQueuedComposerPreviewText(input: {
-  trimmedPrompt: string;
-  images: ReadonlyArray<ComposerImageAttachment>;
-  files: ReadonlyArray<ComposerFileAttachment>;
-  assistantSelections: ReadonlyArray<{ id: string }>;
-  browserAnnotations: ReadonlyArray<BrowserAnnotationDraft>;
-  terminalContexts: ReadonlyArray<TerminalContextDraft>;
-  fileComments: ReadonlyArray<FileCommentDraft>;
-  pastedTexts: ReadonlyArray<PastedTextDraft>;
-}): string {
-  if (input.trimmedPrompt.length > 0) {
-    return input.trimmedPrompt;
-  }
-  const firstImage = input.images[0];
-  if (firstImage) {
-    return `Image: ${firstImage.name}`;
-  }
-  const firstFile = input.files[0];
-  if (firstFile) {
-    return `File: ${firstFile.name}`;
-  }
-  if (input.assistantSelections.length > 0) {
-    return formatAssistantSelectionQueuePreview(input.assistantSelections.length);
-  }
-  const firstBrowserAnnotation = input.browserAnnotations[0];
-  if (firstBrowserAnnotation) {
-    return `#${firstBrowserAnnotation.ordinal} ${formatBrowserAnnotationLabel(firstBrowserAnnotation)}`;
-  }
-  const firstTerminalContext = input.terminalContexts[0];
-  if (firstTerminalContext) {
-    return formatTerminalContextLabel(firstTerminalContext);
-  }
-  const firstFileComment = input.fileComments[0];
-  if (firstFileComment) {
-    return formatFileCommentLabel(firstFileComment);
-  }
-  const pastedTitle = formatPastedTextTitleSeed(input.pastedTexts);
-  if (pastedTitle) {
-    return pastedTitle;
-  }
-  return "Queued follow-up";
-}
-
-function formatPastedTextTitleSeed(pastedTexts: ReadonlyArray<PastedTextDraft>): string | null {
-  const firstPastedText = pastedTexts[0];
-  if (!firstPastedText) {
-    return null;
-  }
-  return pastedTexts.length === 1
-    ? pastedTextTitle(firstPastedText.text)
-    : `${pastedTexts.length} pasted texts`;
-}
-
-const COMPOSER_PATH_QUERY_DEBOUNCE_MS = 120;
-const VOICE_RECORDER_ACTION_ARM_DELAY_MS = 250;
-
-function warnVoiceGuard(event: string, details?: Record<string, unknown>) {
-  if (!import.meta.env.DEV) {
-    return;
-  }
-  if (details) {
-    console.warn(`[voice] ${event}`, details);
-    return;
-  }
-  console.warn(`[voice] ${event}`);
-}
 
 function ComposerControlSkeleton(props: { widthClassName: string }) {
   return (
@@ -1102,6 +714,7 @@ interface ChatViewProps {
   onToggleDiffPanel?: () => void;
   onToggleRightDock?: () => void;
   onToggleBrowserPanel?: () => void;
+  onToggleDevicePanel?: () => void;
   onOpenBrowserUrl?: (url: string) => void;
   onOpenTurnDiffPanel?: (turnId: TurnId, filePath?: string) => void;
   onSplitSurface?: () => void;
@@ -1115,46 +728,6 @@ interface ChatViewProps {
   onCloseThreadPane?: () => void;
 }
 
-function normalizeRestoredQueuedPrompt(value: string): string {
-  return value.trim().replace(/\s+/g, " ");
-}
-
-function composerPromptStillMatchesRestoredQueuedDraft(
-  restoredPrompt: string,
-  nextPrompt: string,
-): boolean {
-  const restored = normalizeRestoredQueuedPrompt(restoredPrompt);
-  const next = normalizeRestoredQueuedPrompt(nextPrompt);
-  if (next.length === 0) {
-    return false;
-  }
-  if (restored.length === 0) {
-    return true;
-  }
-  if (next.includes(restored)) {
-    return true;
-  }
-  if (next.length >= Math.min(16, restored.length) && restored.includes(next)) {
-    return true;
-  }
-  const probe = restored.slice(0, Math.min(48, restored.length));
-  return probe.length >= 16 && next.includes(probe);
-}
-
-// Builds an ephemeral transcript bubble for the conversational automation-setup
-// exchange. These never reach a provider and are not persisted; they render the
-// back-and-forth (user request, Quack's clarifying questions) inline like Codex.
-function makeAutomationSetupBubble(role: "user" | "assistant", text: string): ChatMessage {
-  return {
-    id: newMessageId(),
-    role,
-    text,
-    createdAt: new Date().toISOString(),
-    streaming: false,
-    source: "native",
-  };
-}
-
 export default function ChatView({
   threadId,
   paneScopeId: paneScopeIdProp,
@@ -1165,6 +738,7 @@ export default function ChatView({
   onToggleDiffPanel,
   onToggleRightDock,
   onToggleBrowserPanel,
+  onToggleDevicePanel,
   onOpenBrowserUrl,
   onOpenTurnDiffPanel,
   onSplitSurface,
@@ -1207,13 +781,9 @@ export default function ChatView({
   const clearPaperoModelSelectionForProvider = usePaperoStore(
     (store) => store.clearModelSelectionForProvider,
   );
-  const setPaperoInstructions = usePaperoStore((store) => store.setInstructions);
   const activePaperoModelMap = usePaperoStore(
     (store) => store.modelSelectionByProviderByPaperoId[activePaperoId] ?? EMPTY_PAPERO_MODEL_MAP,
   );
-  // Freeze papero at send so flipping the pill mid-stream does not relabel the in-flight turn.
-  const paperoIdForSendRef = useRef<PaperoId>(activePaperoId);
-  paperoIdForSendRef.current = activePaperoId;
   const timestampFormat = settings.timestampFormat;
   const navigate = useNavigate();
   const { handleNewThread } = useHandleNewThread();
@@ -1905,13 +1475,15 @@ export default function ChatView({
   const activeProject = useStore(
     useMemo(() => createProjectSelector(activeProjectId), [activeProjectId]),
   );
-  const teamScope = useMemo<TeamScope>(
-    () =>
-      activeProject?.kind === "project"
-        ? { kind: "project", projectId: activeProject.id }
-        : GLOBAL_TEAM_SCOPE,
-    [activeProject?.id, activeProject?.kind],
-  );
+  // No useMemo on purpose: the compiler infers `activeProject` as the dependency
+  // while the hand-written list said [activeProject?.id, activeProject?.kind],
+  // and that mismatch made it bail out of memoizing all of ChatView. The only
+  // consumer is react-query, which hashes the key structurally, so a fresh
+  // object per render costs nothing.
+  const teamScope: TeamScope =
+    activeProject?.kind === "project"
+      ? { kind: "project", projectId: activeProject.id }
+      : GLOBAL_TEAM_SCOPE;
   const teamRosterQuery = useQuery({
     queryKey: teamRosterQueryKey(teamScope),
     queryFn: () => ensureNativeApi().team.getRoster({ scope: teamScope }),
@@ -1920,9 +1492,12 @@ export default function ChatView({
     () => composerPaperiFromRoster(teamRosterQuery.data),
     [teamRosterQuery.data],
   );
-  const activePaperoDefinition =
-    composerPaperi.find((definition) => definition.id === activePaperoId) ??
-    getPaperoDefinition(activePaperoId);
+  const resolvePaperoFromRoster = useMemo(
+    () => paperoResolverFromRoster(composerPaperi),
+    [composerPaperi],
+  );
+  const activePaperoDefinition = resolvePaperoFromRoster(activePaperoId);
+  const writePaperoInstructions = useSaveTeamAgentInstructions(teamScope, teamRosterQuery.data);
   const deletePlaceholderTerminalThread = useCallback(
     async (terminalThreadId: ThreadId) => {
       const api = readNativeApi();
@@ -2212,6 +1787,10 @@ export default function ChatView({
   ]);
 
   const sessionProvider = activeThread?.session?.provider ?? null;
+  const hasClaudeAuthRecovery = isClaudeAuthenticationFailedError(
+    sessionProvider,
+    activeThread?.error,
+  );
   const selectedProviderByThreadId = composerDraft.activeProvider ?? null;
   const threadProvider =
     activeThread?.modelSelection.provider ?? activeProject?.defaultModelSelection?.provider ?? null;
@@ -2233,6 +1812,13 @@ export default function ChatView({
   const featureFlags = useFeatureFlags();
   const showDebugTaskBanner = import.meta.env.DEV && featureFlags["show-debug-task-banner"];
   const serverConfigQuery = useQuery(serverConfigQueryOptions());
+  const isClaudeAuthenticated =
+    serverConfigQuery.data?.providers.some(
+      (status) =>
+        status.provider === "claudeAgent" &&
+        status.available &&
+        status.authStatus === "authenticated",
+    ) ?? false;
   const composerModelHintByProvider = useMemo<Record<ProviderKind, string | null>>(() => {
     const threadModelSelection = activeThread?.modelSelection ?? null;
     const projectModelSelection = activeProject?.defaultModelSelection ?? null;
@@ -2253,6 +1839,7 @@ export default function ChatView({
       kilo: resolveHint("kilo"),
       opencode: resolveHint("opencode"),
       pi: resolveHint("pi"),
+      astronaut: resolveHint("astronaut"),
     };
   }, [
     activeProject?.defaultModelSelection,
@@ -2555,18 +2142,27 @@ export default function ChatView({
       ? null
       : (activeLatestTurn?.turnId ?? null);
   // Composer-strip source: the strip needs the routed subagent entries the
-  // transcript drops, so it derives from the parent thread's own activities.
+  // transcript drops. A top-level thread has already derived that exact source
+  // above; reuse it so every live activity does not scan and normalize the full
+  // history twice. Subagent views still derive from their distinct parent source.
   const stripRawWorkLogEntries = useMemo(
     () =>
-      deriveWorkLogEntries(stripSourceActivities, stripSourceLatestTurnId ?? undefined, {
-        visibleTurnIds: stripVisibleTurnIds,
-        activeTurnId: stripLiveTurnId,
-        activeTurnStartedAt: stripSourceLatestTurnStartedAt,
-        latestTurnState: stripSourceLatestTurnState,
-        latestTurnCompletedAt: stripSourceLatestTurnCompletedAt,
+      resolveComposerStripWorkLogEntries({
+        hasDistinctParentSource: stripParentThread !== undefined,
+        activeWorkLogEntries: rawWorkLogEntries,
+        deriveParentWorkLogEntries: () =>
+          deriveWorkLogEntries(stripSourceActivities, stripSourceLatestTurnId ?? undefined, {
+            visibleTurnIds: stripVisibleTurnIds,
+            activeTurnId: stripLiveTurnId,
+            activeTurnStartedAt: stripSourceLatestTurnStartedAt,
+            latestTurnState: stripSourceLatestTurnState,
+            latestTurnCompletedAt: stripSourceLatestTurnCompletedAt,
+          }),
       }),
     [
+      rawWorkLogEntries,
       stripLiveTurnId,
+      stripParentThread,
       stripSourceActivities,
       stripSourceLatestTurnCompletedAt,
       stripSourceLatestTurnId,
@@ -2900,6 +2496,21 @@ export default function ChatView({
     ],
   );
   const isSendBusy = hasPendingSend || (localDispatch !== null && !serverAcknowledgedLocalDispatch);
+  // Publish the unacknowledged dispatch so the thread-detail catch-up poll can
+  // repair a client whose event stream died mid-send. That poll otherwise only
+  // runs for threads the client already believes are running, so a stale-idle
+  // client never asks for the events it is missing and the spinner stays up.
+  useEffect(() => {
+    if (!threadId) {
+      return;
+    }
+    if (!isSendBusy) {
+      usePendingSendStore.getState().clearUnacknowledgedSend(threadId);
+      return;
+    }
+    usePendingSendStore.getState().markUnacknowledgedSend(threadId);
+    return () => usePendingSendStore.getState().clearUnacknowledgedSend(threadId);
+  }, [isSendBusy, threadId]);
   const activeWorktreeSetup = localDispatch?.worktreeSetup ?? null;
   const isPreparingWorktree = activeWorktreeSetup !== null;
   const hasLiveTurn = phase === "running";
@@ -2926,11 +2537,24 @@ export default function ChatView({
     });
     return editTarget.editable ? (editTarget.messageId as MessageId) : null;
   }, [activeThread, isServerThread]);
-  // Defence in depth against a session stuck at "running" with no turn to
-  // complete: nothing would ever drain the composer queue, so messages routed
-  // into it would be swallowed. Server-side reconciliation settles these
-  // sessions; this keeps the composer usable until it does.
-  const hasQueueableLiveTurn = hasLiveTurn && activeThread?.session?.activeTurnId != null;
+  // A running session should queue follow-ups so they are dispatched once the
+  // current turn finishes. Relying on `activeTurnId` being non-null breaks
+  // providers like Claude that clear it between terminal events: in those gaps
+  // the composer would send normally, the server appends the message but cannot
+  // start a new turn, and the follow-up is effectively lost. Server-side
+  // reconciliation settles genuinely stuck sessions so the queue can drain.
+  //
+  // That reconciliation only runs at server boot, so a session left at
+  // "running" with no turn mid-session would hold the queue shut for hours.
+  // Those gaps last a moment in normal operation: if one outlives the grace
+  // period, stop queueing and let the composer send, so a follow-up is never
+  // swallowed by a queue nothing will drain.
+  const isRunningWithoutActiveTurn = hasLiveTurn && activeThread?.session?.activeTurnId == null;
+  const isStuckRunningWithoutActiveTurn = useSustainedFlag(
+    isRunningWithoutActiveTurn,
+    RUNNING_WITHOUT_ACTIVE_TURN_QUEUE_GRACE_MS,
+  );
+  const hasQueueableLiveTurn = hasLiveTurn && !isStuckRunningWithoutActiveTurn;
   const {
     automationProjects,
     automationThreads,
@@ -3237,6 +2861,17 @@ export default function ChatView({
       ),
     [activeThread?.proposedPlans, agentActivityTimelineState.timelineWorkEntries, timelineMessages],
   );
+  const transcriptTimelineEntries = useMemo(
+    () =>
+      hasClaudeAuthRecovery
+        ? timelineEntries.filter(
+            (entry) =>
+              entry.kind !== "message" ||
+              entry.message.text !== CLAUDE_AUTHENTICATION_FAILED_MESSAGE,
+          )
+        : timelineEntries,
+    [hasClaudeAuthRecovery, timelineEntries],
+  );
   const enteringUserMessageIds = useMemo<ReadonlySet<MessageId>>(
     () => new Set(optimisticUserMessages.map((message) => message.id)),
     [optimisticUserMessages],
@@ -3497,6 +3132,106 @@ export default function ChatView({
         workingDirectory: resolvedThreadWorkingDirectory,
       })
     : null;
+  const claudeAuthRecoveryKey = activeThreadId
+    ? `${activeThreadId}:${activeLatestTurn?.turnId ?? "idle"}`
+    : null;
+  const [claudeAuthRecoveryStates, setClaudeAuthRecoveryStates] = useState<
+    Record<
+      string,
+      {
+        status: "idle" | "opening" | "open" | "failed";
+        terminalId: string | null;
+        error: string | null;
+      }
+    >
+  >({});
+  const activeClaudeAuthRecoveryState =
+    claudeAuthRecoveryKey === null
+      ? { status: "idle" as const, terminalId: null, error: null }
+      : (claudeAuthRecoveryStates[claudeAuthRecoveryKey] ?? {
+          status: "idle" as const,
+          terminalId: null,
+          error: null,
+        });
+  const claudeAuthRecoveryUnavailableReason = threadWorkspaceCwd
+    ? null
+    : "This thread has no working directory, so Quack cannot open a login terminal.";
+  // Read off the thread before the callback: React Compiler infers `activeThread` as
+  // the dependency and refuses to preserve a manual list naming the narrower property.
+  const claudeAuthRecoveryWorktreePath = activeThread?.worktreePath ?? null;
+  const openClaudeAuthRecovery = useCallback(async () => {
+    if (
+      !activeThreadId ||
+      !activeProject ||
+      !claudeAuthRecoveryKey ||
+      !threadWorkspaceCwd ||
+      !hasClaudeAuthRecovery
+    ) {
+      return;
+    }
+    const current = claudeAuthRecoveryStates[claudeAuthRecoveryKey];
+    if (current?.terminalId && terminalState.terminalIds.includes(current.terminalId)) {
+      setTerminalPresentationMode("drawer");
+      setTerminalOpen(true);
+      storeSetActiveTerminal(activeThreadId, current.terminalId);
+      requestTerminalFocus();
+      return;
+    }
+
+    const api = readNativeApi();
+    if (!api) return;
+    const terminalId = randomTerminalId();
+    setClaudeAuthRecoveryStates((states) => ({
+      ...states,
+      [claudeAuthRecoveryKey]: { status: "opening", terminalId, error: null },
+    }));
+    setTerminalPresentationMode("drawer");
+    setTerminalOpen(true);
+    storeNewTerminal(activeThreadId, terminalId);
+    requestTerminalFocus();
+    try {
+      await runProjectCommandInTerminal({
+        api,
+        threadId: activeThreadId,
+        terminalId,
+        project: { cwd: activeProject.cwd },
+        cwd: threadWorkspaceCwd,
+        command: CLAUDE_AUTH_LOGIN_COMMAND,
+        worktreePath: claudeAuthRecoveryWorktreePath,
+      });
+      storeSetTerminalMetadata(activeThreadId, terminalId, {
+        cliKind: "claude",
+        label: "Claude Code",
+      });
+      setClaudeAuthRecoveryStates((states) => ({
+        ...states,
+        [claudeAuthRecoveryKey]: { status: "open", terminalId, error: null },
+      }));
+    } catch (error) {
+      // Hoisted out of the updater: a value block read inside a closure declared in
+      // `catch` trips a React Compiler invariant — see chatHotPath.compiler.test.ts.
+      const message = error instanceof Error ? error.message : "Could not open the login terminal.";
+      setClaudeAuthRecoveryStates((states) => ({
+        ...states,
+        [claudeAuthRecoveryKey]: { status: "failed", terminalId: null, error: message },
+      }));
+    }
+  }, [
+    activeProject,
+    activeThreadId,
+    claudeAuthRecoveryKey,
+    claudeAuthRecoveryWorktreePath,
+    claudeAuthRecoveryStates,
+    hasClaudeAuthRecovery,
+    requestTerminalFocus,
+    setTerminalOpen,
+    setTerminalPresentationMode,
+    storeNewTerminal,
+    storeSetActiveTerminal,
+    storeSetTerminalMetadata,
+    terminalState.terminalIds,
+    threadWorkspaceCwd,
+  ]);
   const threadArtifactWorkspaceRoot = resolveThreadArtifactWorkspaceRoot({
     isStudioContainer,
     projectCwd: activeProject?.cwd ?? null,
@@ -3912,6 +3647,25 @@ export default function ChatView({
     [providerStatuses],
   );
   const refreshProviderStatuses = useRefreshProviderStatusesNow();
+  useEffect(() => {
+    if (
+      !hasClaudeAuthRecovery ||
+      activeClaudeAuthRecoveryState.status !== "open" ||
+      isClaudeAuthenticated
+    ) {
+      return;
+    }
+
+    const refresh = () => void refreshProviderStatuses({ silent: true });
+    refresh();
+    const intervalId = window.setInterval(refresh, 3_000);
+    return () => window.clearInterval(intervalId);
+  }, [
+    activeClaudeAuthRecoveryState.status,
+    hasClaudeAuthRecovery,
+    isClaudeAuthenticated,
+    refreshProviderStatuses,
+  ]);
   const activeProjectCwd = activeProject?.cwd ?? null;
   const activeThreadWorktreePath = isStudioContainer ? null : (activeThread?.worktreePath ?? null);
   const hasNativeUserMessages = useMemo(
@@ -6156,7 +5910,6 @@ export default function ChatView({
     (paperoId: PaperoId) => {
       if (!activeThread) return;
       setActivePaperoId(activeThread.id, paperoId);
-      paperoIdForSendRef.current = paperoId;
       const slot = resolvePaperoModelForProvider(paperoId, selectedProvider);
       if (slot) {
         setComposerDraftModelSelectionAndSticky(activeThread.id, slot);
@@ -6167,9 +5920,7 @@ export default function ChatView({
           });
         }
       }
-      const definition =
-        composerPaperi.find((candidate) => candidate.id === paperoId) ??
-        getPaperoDefinition(paperoId);
+      const definition = resolvePaperoFromRoster(paperoId);
       toastManager.add({
         type: "success",
         title: `${definition.label}`,
@@ -6179,7 +5930,7 @@ export default function ChatView({
     },
     [
       activeThread,
-      composerPaperi,
+      resolvePaperoFromRoster,
       resolvePaperoModelForProvider,
       scheduleComposerFocus,
       selectedProvider,
@@ -6211,25 +5962,35 @@ export default function ChatView({
   );
 
   const onSavePaperoInstructions = useCallback(
-    (paperoId: PaperoId, instructions: string) => {
-      setPaperoInstructions(paperoId, instructions);
-      const definition =
-        composerPaperi.find((candidate) => candidate.id === paperoId) ??
-        getPaperoDefinition(paperoId);
+    async (paperoId: PaperoId, instructions: string) => {
+      const failure = await savePaperoInstructionsFailure(
+        writePaperoInstructions,
+        paperoId,
+        instructions,
+      );
+      if (failure) {
+        toastManager.add({
+          type: "error",
+          title: "Could not save instructions",
+          description: failure,
+        });
+        return;
+      }
+      const definition = resolvePaperoFromRoster(paperoId);
       toastManager.add({
         type: "success",
         title: "Instructions saved",
         description: `${definition.label} will use these from the next message`,
       });
     },
-    [composerPaperi, setPaperoInstructions],
+    [resolvePaperoFromRoster, writePaperoInstructions],
   );
 
   const onResetPaperoInstructions = useCallback(
     (paperoId: PaperoId) => {
-      setPaperoInstructions(paperoId, null);
+      void writePaperoInstructions(paperoId, null);
     },
-    [setPaperoInstructions],
+    [writePaperoInstructions],
   );
 
   useEffect(() => {
@@ -6495,6 +6256,15 @@ export default function ChatView({
         return;
       }
 
+      if (command === "device.toggle") {
+        event.preventDefault();
+        event.stopPropagation();
+        // Unlike the browser this works in a plain tab, but only against a macOS
+        // server; the surface leaves the handler unwired when it cannot host one.
+        onToggleDevicePanel?.();
+        return;
+      }
+
       if (command === "chat.split") {
         event.preventDefault();
         event.stopPropagation();
@@ -6535,6 +6305,7 @@ export default function ChatView({
     terminalWorkspaceOpen,
     terminalWorkspaceTerminalTabActive,
     onToggleBrowser,
+    onToggleDevicePanel,
     onToggleDiff,
     onInterruptFromStopControl,
     onSplitSurface,
@@ -7737,6 +7508,49 @@ export default function ChatView({
       });
     }
 
+    const devicePromptAttachment: DevicePromptAttachmentResolution =
+      await maybeResolveDevicePromptAttachment({
+        api,
+        threadId: activeThread.id,
+        prompt: promptForSend,
+      }).catch(
+        (): DevicePromptAttachmentResolution => ({
+          requested: false,
+          image: null,
+        }),
+      );
+    if (devicePromptAttachment.image) {
+      const nextAttachmentCount =
+        composerImagesForSend.length +
+        composerFilesForSend.length +
+        composerAssistantSelectionsForSend.length +
+        1;
+      if (nextAttachmentCount <= PROVIDER_SEND_TURN_MAX_ATTACHMENTS) {
+        composerImagesForSend = [...composerImagesForSend, devicePromptAttachment.image];
+      } else {
+        toastManager.add({
+          type: "warning",
+          title: `You can attach up to ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} references per message.`,
+          description:
+            "The simulator screenshot was skipped because this message is already at the attachment limit.",
+        });
+      }
+    } else if (devicePromptAttachment.requested) {
+      const description =
+        devicePromptAttachment.reason === "no-attached-device"
+          ? "Open the iOS Simulator panel and choose a device first, then try again."
+          : devicePromptAttachment.reason === "device-not-booted"
+            ? "The selected simulator is still starting up."
+            : devicePromptAttachment.reason === "attachment-processing-failed"
+              ? "The simulator screenshot could not be optimized for attachment."
+              : "The current simulator context could not be attached.";
+      toastManager.add({
+        type: "warning",
+        title: "Couldn’t attach the simulator screen",
+        description,
+      });
+    }
+
     if (hasQueueableLiveTurn && dispatchMode === "queue" && queuedChatTurn === null) {
       clearComposerInput(activeThread.id);
       scheduleComposerFocus();
@@ -7791,6 +7605,7 @@ export default function ChatView({
       return true;
     }
     const threadIdForSend = activeThread.id;
+    const paperoIdForSend = readPaperoIdForSend(threadIdForSend);
     const isFirstMessage = !isServerThread || !hasNativeUserMessages;
     const firstSendCreatedAt = new Date();
     let firstComposerImageNameForTitle: string | null = null;
@@ -8085,7 +7900,7 @@ export default function ChatView({
         ...(mentionedPluginMentionsForSend.length > 0
           ? { mentions: mentionedPluginMentionsForSend }
           : {}),
-        paperoId: paperoIdForSendRef.current,
+        paperoId: paperoIdForSend,
         // Stamped locally too, so the live Thinking row shows model + effort
         // before the server message lands.
         modelSelection: selectedModelSelectionForSend,
@@ -8315,13 +8130,9 @@ export default function ChatView({
             ...(mentionedPluginMentionsForSend.length > 0
               ? { mentions: mentionedPluginMentionsForSend }
               : {}),
-            paperoId: paperoIdForSendRef.current,
-            ...(() => {
-              const override = usePaperoStore
-                .getState()
-                .overridesByPaperoId[paperoIdForSendRef.current]?.instructions?.trim();
-              return override ? { paperoInstructions: override } : {};
-            })(),
+            // No paperoInstructions: the server resolves the Team agent for every turn
+            // and that resolution wins, so anything sent from here is discarded.
+            paperoId: paperoIdForSend,
           },
           modelSelection: selectedModelSelectionForSend,
           ...(providerOptionsForDispatchForSend
@@ -8480,15 +8291,16 @@ export default function ChatView({
 
   // Every exit of `runSend` (success, bail-out, throw) releases the pending-send
   // flag; on success `localDispatch` already keeps the busy state alive.
-  const onSend = async (...args: Parameters<typeof runSend>): ReturnType<typeof runSend> => {
+  // Written as `Promise.finally` rather than try/finally on purpose: the React
+  // Compiler cannot lower a try without a catch, and bailing out here would
+  // strip ChatView's memoization on the chat hot path.
+  const onSend = (...args: Parameters<typeof runSend>): ReturnType<typeof runSend> => {
     const pendingSendThreadId = activeThread?.id ?? null;
-    try {
-      return await runSend(...args);
-    } finally {
+    return runSend(...args).finally(() => {
       if (pendingSendThreadId) {
         usePendingSendStore.getState().clearPendingSend(pendingSendThreadId);
       }
-    }
+    });
   };
 
   const onRespondToApproval = useCallback(
@@ -8798,6 +8610,7 @@ export default function ChatView({
     }
 
     const threadIdForSend = activeThread.id;
+    const paperoIdForSend = readPaperoIdForSend(threadIdForSend);
     const messageIdForSend = newMessageId();
     const messageCreatedAt = new Date().toISOString();
     const outgoingMessageText = formatOutgoingComposerPrompt({
@@ -8817,7 +8630,7 @@ export default function ChatView({
         role: "user",
         text: outgoingMessageText,
         dispatchMode,
-        paperoId: paperoIdForSendRef.current,
+        paperoId: paperoIdForSend,
         modelSelection: queuedTurn?.modelSelection ?? selectedModelSelection,
         createdAt: messageCreatedAt,
         streaming: false,
@@ -8867,7 +8680,7 @@ export default function ChatView({
           role: "user",
           text: outgoingMessageText,
           attachments: [],
-          paperoId: paperoIdForSendRef.current,
+          paperoId: paperoIdForSend,
         },
         modelSelection: modelSelectionForPlanDispatch,
         ...(providerOptionsForPlanDispatch
@@ -11611,7 +11424,7 @@ export default function ChatView({
                               ) : (
                                 <ComposerSendArrowIcon
                                   aria-hidden="true"
-                                  className="size-5 shrink-0"
+                                  className="size-5 shrink-0 translate-y-px"
                                 />
                               )}
                             </Button>
@@ -11796,12 +11609,14 @@ export default function ChatView({
         status={shouldShowProviderHealthBanner ? visibleActiveProviderStatus : null}
         onDismiss={dismissActiveProviderHealthBanner}
       />
-      <ThreadErrorBanner
-        error={activeThread.error}
-        onDismiss={dismissActiveThreadError}
-        onUnblock={unblockActiveThread}
-        unblocking={unblockingActiveThread}
-      />
+      {!hasClaudeAuthRecovery ? (
+        <ThreadErrorBanner
+          error={activeThread.error}
+          onDismiss={dismissActiveThreadError}
+          onUnblock={unblockActiveThread}
+          unblocking={unblockingActiveThread}
+        />
+      ) : null}
       <RateLimitBanner
         rateLimitStatus={visibleActiveRateLimitStatus}
         onDismiss={dismissActiveRateLimitBanner}
@@ -11910,74 +11725,88 @@ export default function ChatView({
             {shouldRenderChatPaneContent && !isCenteredEmptyLanding ? (
               <div className="flex min-h-0 flex-1 flex-col">
                 <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-                  <ChatTranscriptPane
-                    activeThreadId={activeThread.id}
-                    activeTurnId={activeTurnIdForTranscript}
-                    subagentStreamAvatarSeed={activeSubagentPresentation?.avatarSeed}
-                    subagentStreamLabel={activeSubagentPresentation?.fullLabel}
-                    agentActivityDetail={openAgentActivityDetail}
-                    hasMessages={timelineEntries.length > 0}
-                    isWorking={hasLiveTurn}
-                    worktreeSetup={activeWorktreeSetup}
-                    activeTurnInProgress={activeTurnInProgress}
-                    activeTurnStartedAt={activeWorkStartedAt}
-                    listRef={legendListRef}
-                    timelineControllerRef={timelineControllerRef}
-                    pinnedMessageIds={pinnedMessageIds}
-                    canPinMessage={canPinMessage}
-                    onTogglePinMessage={handleTogglePinMessageGuarded}
-                    threadMarkers={threadMarkers}
-                    enteringUserMessageIds={enteringUserMessageIds}
-                    tailAnchorMessageId={
-                      tailAnchor !== null && tailAnchor.threadId === activeThread.id
-                        ? tailAnchor.messageId
-                        : null
-                    }
-                    tailAnchorScrollInFlightRef={tailAnchorScrollInFlightRef}
-                    crossTaskOrigin={crossTaskOrigin}
-                    timelineEntries={timelineEntries}
-                    turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
-                    onOpenTurnDiff={onOpenTurnDiff}
-                    onOpenThread={onNavigateToThread}
-                    onOpenAutomation={onOpenAutomation}
-                    revertTurnCountByUserMessageId={revertTurnCountByUserMessageId}
-                    onRevertUserMessage={onRevertUserMessage}
-                    onUndoTurnFiles={onUndoTurnFiles}
-                    onEditUserMessage={onEditUserMessage}
-                    editableUserMessageId={editableUserMessageId}
-                    isRevertingCheckpoint={isRevertingCheckpoint}
-                    onExpandTimelineImage={onExpandTimelineImage}
-                    followLiveOutput={hasStreamingAssistantText}
-                    onIsAtEndChange={onIsAtEndChange}
-                    markdownCwd={threadWorkspaceCwd ?? undefined}
-                    resolvedTheme={resolvedTheme}
-                    chatFontSizePx={settings.chatFontSizePx}
-                    smoothStreamingText={settings.enableSmoothStreamingText}
-                    timestampFormat={timestampFormat}
-                    workspaceRoot={threadArtifactWorkspaceRoot ?? undefined}
-                    emptyStateContent={transcriptEmptyStateContent}
-                    emptyStateProjectName={activeProjectDisplayName}
-                    terminalWorkspaceTerminalTabActive={terminalWorkspaceTerminalTabActive}
-                    onMessagesScroll={onMessagesScroll}
-                    onMessagesClickCapture={onMessagesClickCapture}
-                    onMessagesMouseUp={onMessagesMouseUp}
-                    onMessagesWheel={onMessagesWheel}
-                    onMessagesPointerDown={onMessagesPointerDown}
-                    onMessagesPointerUp={onMessagesPointerUp}
-                    onMessagesPointerCancel={onMessagesPointerCancel}
-                    onMessagesTouchStart={onMessagesTouchStart}
-                    onMessagesTouchMove={onMessagesTouchMove}
-                    onMessagesTouchEnd={onMessagesTouchEnd}
-                    onOpenAgentActivity={setOpenAgentActivityId}
-                    onCloseAgentActivityDetail={() => setOpenAgentActivityId(null)}
-                    scrollButtonVisible={showScrollToBottom}
-                    onScrollToBottom={onScrollToBottom}
-                    contentInsetRightPx={
-                      environmentAppliesContentInset
-                        ? ENVIRONMENT_DOCKED_CONTENT_INSET_PX
-                        : undefined
-                    }
-                  />
+                  <PaperoIdentityContext.Provider value={resolvePaperoFromRoster}>
+                    <ChatTranscriptPane
+                      activeThreadId={activeThread.id}
+                      activeTurnId={activeTurnIdForTranscript}
+                      subagentStreamAvatarSeed={activeSubagentPresentation?.avatarSeed}
+                      subagentStreamLabel={activeSubagentPresentation?.fullLabel}
+                      agentActivityDetail={openAgentActivityDetail}
+                      hasMessages={timelineEntries.length > 0}
+                      isWorking={hasLiveTurn}
+                      worktreeSetup={activeWorktreeSetup}
+                      activeTurnInProgress={activeTurnInProgress}
+                      activeTurnStartedAt={activeWorkStartedAt}
+                      claudeAuthRecovery={
+                        hasClaudeAuthRecovery
+                          ? {
+                              status: activeClaudeAuthRecoveryState.status,
+                              authenticated: isClaudeAuthenticated,
+                              error: activeClaudeAuthRecoveryState.error,
+                              unavailableReason: claudeAuthRecoveryUnavailableReason,
+                            }
+                          : null
+                      }
+                      onOpenClaudeAuthRecovery={openClaudeAuthRecovery}
+                      onDismissClaudeAuthRecovery={dismissActiveThreadError}
+                      listRef={legendListRef}
+                      timelineControllerRef={timelineControllerRef}
+                      pinnedMessageIds={pinnedMessageIds}
+                      canPinMessage={canPinMessage}
+                      onTogglePinMessage={handleTogglePinMessageGuarded}
+                      threadMarkers={threadMarkers}
+                      enteringUserMessageIds={enteringUserMessageIds}
+                      tailAnchorMessageId={
+                        tailAnchor !== null && tailAnchor.threadId === activeThread.id
+                          ? tailAnchor.messageId
+                          : null
+                      }
+                      tailAnchorScrollInFlightRef={tailAnchorScrollInFlightRef}
+                      crossTaskOrigin={crossTaskOrigin}
+                      timelineEntries={transcriptTimelineEntries}
+                      turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
+                      onOpenTurnDiff={onOpenTurnDiff}
+                      onOpenThread={onNavigateToThread}
+                      onOpenAutomation={onOpenAutomation}
+                      revertTurnCountByUserMessageId={revertTurnCountByUserMessageId}
+                      onRevertUserMessage={onRevertUserMessage}
+                      onUndoTurnFiles={onUndoTurnFiles}
+                      onEditUserMessage={onEditUserMessage}
+                      editableUserMessageId={editableUserMessageId}
+                      isRevertingCheckpoint={isRevertingCheckpoint}
+                      onExpandTimelineImage={onExpandTimelineImage}
+                      followLiveOutput={hasStreamingAssistantText}
+                      onIsAtEndChange={onIsAtEndChange}
+                      markdownCwd={threadWorkspaceCwd ?? undefined}
+                      resolvedTheme={resolvedTheme}
+                      chatFontSizePx={settings.chatFontSizePx}
+                      smoothStreamingText={settings.enableSmoothStreamingText}
+                      timestampFormat={timestampFormat}
+                      workspaceRoot={threadArtifactWorkspaceRoot ?? undefined}
+                      emptyStateContent={transcriptEmptyStateContent}
+                      emptyStateProjectName={activeProjectDisplayName}
+                      terminalWorkspaceTerminalTabActive={terminalWorkspaceTerminalTabActive}
+                      onMessagesScroll={onMessagesScroll}
+                      onMessagesClickCapture={onMessagesClickCapture}
+                      onMessagesMouseUp={onMessagesMouseUp}
+                      onMessagesWheel={onMessagesWheel}
+                      onMessagesPointerDown={onMessagesPointerDown}
+                      onMessagesPointerUp={onMessagesPointerUp}
+                      onMessagesPointerCancel={onMessagesPointerCancel}
+                      onMessagesTouchStart={onMessagesTouchStart}
+                      onMessagesTouchMove={onMessagesTouchMove}
+                      onMessagesTouchEnd={onMessagesTouchEnd}
+                      onOpenAgentActivity={setOpenAgentActivityId}
+                      onCloseAgentActivityDetail={() => setOpenAgentActivityId(null)}
+                      scrollButtonVisible={showScrollToBottom}
+                      onScrollToBottom={onScrollToBottom}
+                      contentInsetRightPx={
+                        environmentAppliesContentInset
+                          ? ENVIRONMENT_DOCKED_CONTENT_INSET_PX
+                          : undefined
+                      }
+                    />
+                  </PaperoIdentityContext.Provider>
                 </div>
 
                 <div

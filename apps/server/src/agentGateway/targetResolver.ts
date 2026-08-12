@@ -11,6 +11,7 @@ import {
   type ProviderModelDescriptor,
   type ServerProviderAuthStatus,
 } from "@synara/contracts";
+import { hasDefaultModel } from "@synara/shared/model";
 import { Effect } from "effect";
 
 import type { ProviderDiscoveryServiceShape } from "../provider/Services/ProviderDiscoveryService.ts";
@@ -236,10 +237,16 @@ const PROVIDER_TARGET_OPTION_RULES = {
       }),
     },
   }),
+  // Companion forwards the target verbatim: the paired machine owns the options,
+  // so it has no option keys and cannot go through defineProviderOptionConfig.
+  astronaut: {
+    primaryOptionKey: "model",
+    options: {} as Readonly<Record<string, ProviderTargetOptionRuleSpec>>,
+  },
 } as const satisfies Record<ProviderKind, ProviderTargetOptionConfig>;
 
 function providerDefaultModel(provider: ProviderKind): string | null {
-  return provider === "pi" ? null : DEFAULT_MODEL_BY_PROVIDER[provider];
+  return hasDefaultModel(provider) ? DEFAULT_MODEL_BY_PROVIDER[provider] : null;
 }
 
 export function loadAgentGatewayProviderCatalog(input: {

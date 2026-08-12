@@ -326,6 +326,12 @@ describe("wsNativeApi", () => {
             customModels: [],
           },
           pi: { enabled: true, binaryPath: "pi", agentDir: "", customModels: [] },
+          astronaut: {
+            enabled: true,
+            binaryPath: "",
+            serverUrl: "http://companion.local:4567",
+            customModels: [],
+          },
         },
         skills: { disabled: [] },
       },
@@ -541,7 +547,10 @@ describe("wsNativeApi", () => {
   });
 
   it("forwards workspace file writes to the websocket project method", async () => {
-    requestMock.mockResolvedValue({ relativePath: "plan.md" });
+    requestMock.mockResolvedValue({
+      relativePath: "plan.md",
+      version: `sha256:${"1".repeat(64)}`,
+    });
     const { createWsNativeApi } = await import("./wsNativeApi");
 
     const api = createWsNativeApi();
@@ -563,6 +572,9 @@ describe("wsNativeApi", () => {
       relativePath: "src/app.ts",
       contents: "export {};\n",
       truncated: false,
+      version: `sha256:${"1".repeat(64)}`,
+      encoding: "utf8",
+      lineEnding: "lf",
     });
     const { createWsNativeApi } = await import("./wsNativeApi");
 

@@ -467,6 +467,8 @@ const PROVIDER_SKILL_ORIGIN_PREFERENCES = {
   kilo: ["kilo", "agents", "claude"],
   opencode: ["opencode", "claude", "agents"],
   pi: ["pi", "agents"],
+  // Companion's skills live on the paired machine, not in a local home.
+  astronaut: [],
 } as const satisfies Partial<Record<ProviderKind, readonly SkillsHomeOrigin[]>>;
 
 function homeRootsForOrigin(

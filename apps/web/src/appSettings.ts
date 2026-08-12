@@ -116,7 +116,8 @@ type CustomModelSettingsKey =
   | "customDroidModels"
   | "customKiloModels"
   | "customOpenCodeModels"
-  | "customPiModels";
+  | "customPiModels"
+  | "customAstronautModels";
 export type ProviderCustomModelConfig = {
   provider: ProviderKind;
   settingsKey: CustomModelSettingsKey;
@@ -137,6 +138,7 @@ const BUILT_IN_MODEL_SLUGS_BY_PROVIDER: Record<ProviderKind, ReadonlySet<string>
   kilo: new Set(getModelOptions("kilo").map((option) => option.slug)),
   opencode: new Set(getModelOptions("opencode").map((option) => option.slug)),
   pi: new Set(getModelOptions("pi").map((option) => option.slug)),
+  astronaut: new Set<string>(),
 };
 
 const withDefaults =
@@ -163,6 +165,7 @@ const PersistedProviderKind = Schema.Literals([
   "kilo",
   "opencode",
   "pi",
+  "astronaut",
 ]).pipe(
   Schema.decodeTo(
     ProviderKind,
@@ -270,6 +273,8 @@ export const AppSettingsSchema = Schema.Struct({
   customKiloModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
   customOpenCodeModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
   customPiModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
+  customAstronautModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
+  astronautServerUrl: Schema.String.pipe(withDefaults(() => "http://imac-di-alek:4567")),
   textGenerationProvider: PersistedProviderKind.pipe(withDefaults(() => "codex" as const)),
   textGenerationModel: Schema.optional(TrimmedNonEmptyString),
   uiFontFamily: Schema.String.check(Schema.isMaxLength(256)).pipe(withDefaults(() => "")),
@@ -406,6 +411,15 @@ const PROVIDER_CUSTOM_MODEL_CONFIG: Record<ProviderKind, ProviderCustomModelConf
     description: "Save additional Pi model slugs for the picker and provider runtime.",
     placeholder: "provider/model",
     example: "anthropic/claude-sonnet-4-5",
+  },
+  astronaut: {
+    provider: "astronaut",
+    settingsKey: "customAstronautModels",
+    defaultSettingsKey: "customAstronautModels",
+    title: "Companion",
+    description: "Save Companion model IDs for the picker and remote companion.",
+    placeholder: "model-id",
+    example: "claude-sonnet",
   },
 };
 
@@ -555,6 +569,7 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
     customKiloModels: normalizeCustomModelSlugs(settings.customKiloModels, "kilo"),
     customOpenCodeModels: normalizeCustomModelSlugs(settings.customOpenCodeModels, "opencode"),
     customPiModels: normalizeCustomModelSlugs(settings.customPiModels, "pi"),
+    customAstronautModels: normalizeCustomModelSlugs(settings.customAstronautModels, "astronaut"),
     hiddenProviders: normalizeHiddenProviders(settings.hiddenProviders),
     providerOrder: normalizeProviderOrder(settings.providerOrder),
     hiddenModels: [],
@@ -583,6 +598,7 @@ function serverSettingsToAppSettings(settings: ServerSettingsView): Partial<AppS
     openCodeServerUrl: settings.providers.opencode.serverUrl,
     piAgentDir: settings.providers.pi.agentDir,
     piBinaryPath: settings.providers.pi.binaryPath,
+    astronautServerUrl: settings.providers.astronaut.serverUrl,
     customCodexModels: settings.providers.codex.customModels,
     customClaudeModels: settings.providers.claudeAgent.customModels,
     customCursorModels: settings.providers.cursor.customModels,
@@ -592,6 +608,7 @@ function serverSettingsToAppSettings(settings: ServerSettingsView): Partial<AppS
     customKiloModels: settings.providers.kilo.customModels,
     customOpenCodeModels: settings.providers.opencode.customModels,
     customPiModels: settings.providers.pi.customModels,
+    customAstronautModels: settings.providers.astronaut.customModels,
     textGenerationProvider: settings.textGenerationModelSelection.provider,
     textGenerationModel: settings.textGenerationModelSelection.model,
   };
@@ -759,6 +776,15 @@ function appSettingsPatchToServerSettingsPatch(patch: Partial<AppSettings>): Ser
     };
   }
 
+  if (hasOwn(patch, "customAstronautModels") || hasOwn(patch, "astronautServerUrl")) {
+    providers.astronaut = {
+      ...(hasOwn(patch, "customAstronautModels")
+        ? { customModels: patch.customAstronautModels ?? [] }
+        : {}),
+      ...(hasOwn(patch, "astronautServerUrl") ? { serverUrl: patch.astronautServerUrl ?? "" } : {}),
+    };
+  }
+
   if (Object.keys(providers).length > 0) {
     serverPatch.providers = providers;
   }
@@ -870,6 +896,7 @@ export function getCustomModelsByProvider(
     droid: getCustomModelsForProvider(settings, "droid"),
     kilo: getCustomModelsForProvider(settings, "kilo"),
     opencode: getCustomModelsForProvider(settings, "opencode"),
+    astronaut: getCustomModelsForProvider(settings, "astronaut"),
     pi: getCustomModelsForProvider(settings, "pi"),
   };
 }
@@ -879,12 +906,14 @@ export function getAppModelOptions(
   customModels: readonly string[],
   selectedModel?: string | null,
 ): AppModelOption[] {
-  const options: AppModelOption[] = getModelOptions(provider).map(({ slug, name }) => ({
-    provider,
-    slug,
-    name,
-    isCustom: false,
-  }));
+  const options: AppModelOption[] = (provider === "astronaut" ? [] : getModelOptions(provider)).map(
+    ({ slug, name }) => ({
+      provider,
+      slug,
+      name,
+      isCustom: false,
+    }),
+  );
   const seen = new Set(options.map((option) => option.slug));
   const trimmedSelectedModel = selectedModel?.trim().toLowerCase();
 
@@ -1018,6 +1047,7 @@ export function getCustomModelOptionsByProvider(
     droid: getAppModelOptions("droid", customModelsByProvider.droid),
     kilo: getAppModelOptions("kilo", customModelsByProvider.kilo),
     opencode: getAppModelOptions("opencode", customModelsByProvider.opencode),
+    astronaut: getAppModelOptions("astronaut", customModelsByProvider.astronaut),
     pi: getAppModelOptions("pi", customModelsByProvider.pi),
   };
 }
@@ -1040,6 +1070,7 @@ export function getProviderStartOptions(
     | "openCodeServerUrl"
     | "piAgentDir"
     | "piBinaryPath"
+    | "astronautServerUrl"
   >,
 ): ProviderStartOptions | undefined {
   const claudeBinaryPath = normalizeProviderBinaryPathOverride(
@@ -1133,6 +1164,9 @@ export function getProviderStartOptions(
           },
         }
       : {}),
+    ...(settings.astronautServerUrl
+      ? { astronaut: { serverUrl: settings.astronautServerUrl } }
+      : {}),
   };
 
   return Object.keys(providerOptions).length > 0 ? providerOptions : undefined;
@@ -1200,6 +1234,9 @@ export function getCustomBinaryPathForProvider(
       return normalizeProviderBinaryPathOverride(provider, settings.openCodeBinaryPath);
     case "pi":
       return normalizeProviderBinaryPathOverride(provider, settings.piBinaryPath);
+    // Companion runs on the paired machine: no local binary to override.
+    case "astronaut":
+      return "";
   }
 }
 
