@@ -22,10 +22,16 @@ const STOP_SIGNAL_SETTLE_MS = 450;
 const MAX_PROCESS_ARGS_CHARS = 1_000;
 const PROCESS_LINEAGE_MAX_DEPTH = 4;
 const PAGE_TITLE_MAX_CHARS = 200;
-const PAGE_TITLE_FETCH_TIMEOUT_MS = 650;
+const PAGE_TITLE_FETCH_TIMEOUT_MS = 1_500;
 const PAGE_TITLE_MAX_BYTES = 128 * 1024;
 const PAGE_TITLE_SUCCESS_TTL_MS = 30_000;
-const PAGE_TITLE_FAILURE_TTL_MS = 10_000;
+// A dev server that compiles on demand (`next dev`) needs seconds to render `/`
+// the first time, so the probe times out, and aborting it does not stop the
+// render. With a short failure TTL the UI re-probes every refresh forever and
+// keeps that server pinned at ~75% CPU. Remember failures for long enough that
+// a slow server is asked at most a couple of times per hour.
+// Brain: 2026-08-13-local-server-title-probe-hammers-dev-servers
+const PAGE_TITLE_FAILURE_TTL_MS = 15 * 60_000;
 const PAGE_TITLE_FETCH_CONCURRENCY = 4;
 const PAGE_TITLE_MAX_URLS_PER_SERVER = 3;
 const PAGE_TITLE_REDIRECT_LIMIT = 3;

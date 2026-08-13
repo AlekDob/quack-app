@@ -20,8 +20,8 @@ tags: [composer, activity-strip, subagents, browser-automation, background-work]
 | Type      | Path                                                               | Exports/Purpose                                                                                                  |
 | --------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | Logic     | `apps/web/src/components/chat/ComposerActivityStrip.logic.ts`      | `deriveComposerActivityStripRows`, `deriveComposerBackgroundActivityRows`, `activityStripHeaderLabel`, row types |
-| Component | `apps/web/src/components/chat/ComposerActivityStrip.tsx`           | Renders the unified strip; `BackgroundActivityRow` for command rows                                             |
-| Component | `apps/web/src/components/chat/ComposerBrowserActivityPill.tsx`     | Dedicated Browser status marker above the composer                                                             |
+| Component | `apps/web/src/components/chat/ComposerActivityStrip.tsx`           | Renders the unified strip; `BackgroundActivityRow` for command rows                                              |
+| Component | `apps/web/src/components/chat/ComposerBrowserActivityPill.tsx`     | Dedicated Browser status marker above the composer                                                               |
 | Util      | `apps/web/src/lib/subagentPresentation.ts`                         | `SubagentStatusKind` (adds `"attention"`), dot/tone/label helpers shared by subagent and background rows         |
 | Store     | `apps/web/src/browserStateStore.ts`                                | `selectThreadBrowserState` — source for the browser automation row                                               |
 | Consumer  | `apps/web/src/components/ChatView.tsx`                             | Wires `threadBrowserState`, `onOpenBrowserPanel` into the strip                                                  |

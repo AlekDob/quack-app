@@ -320,6 +320,31 @@ describe("localServerMonitor", () => {
     expect(enriched[0]?.pageTitle).toBe("Local Redirect");
   });
 
+  // Brain: 2026-08-13-local-server-title-probe-hammers-dev-servers
+  // A failed probe must stay cached: re-probing a slow `next dev` every refresh
+  // makes it recompile `/` forever and pins it at ~75% CPU.
+  it("does not re-probe a page title that already failed", async () => {
+    const port = 59175;
+    const processInfo = new Map<number, LocalServerProcessInfo>([
+      [123, { ppid: 1, commandLine: "node ./node_modules/.bin/vite" }],
+    ]);
+    const servers = buildLocalServerProcesses(
+      parseLsofTcpListenOutput(["p123", "cnode", "PTCP", `n127.0.0.1:${port}`].join("\n")),
+      processInfo,
+    );
+    const fetchMock = vi.fn(async () => {
+      throw new Error("timed out");
+    }) as unknown as typeof globalThis.fetch;
+
+    await withMockedFetch(fetchMock, () => enrichLocalServerProcessesWithPageTitles(servers));
+    const callsAfterFirstPass = vi.mocked(fetchMock).mock.calls.length;
+    expect(callsAfterFirstPass).toBeGreaterThan(0);
+
+    await withMockedFetch(fetchMock, () => enrichLocalServerProcessesWithPageTitles(servers));
+
+    expect(vi.mocked(fetchMock).mock.calls.length).toBe(callsAfterFirstPass);
+  });
+
   it("does not follow page-title redirects to external hosts", async () => {
     const port = 59174;
     const startUrl = `http://127.0.0.1:${port}`;

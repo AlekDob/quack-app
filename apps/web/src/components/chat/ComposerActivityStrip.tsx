@@ -158,12 +158,7 @@ export const ComposerActivityStrip = function ComposerActivityStrip({
               );
             }
             if (item.kind === "activity") {
-              return (
-                <BackgroundActivityRow
-                  key={item.key}
-                  item={item}
-                />
-              );
+              return <BackgroundActivityRow key={item.key} item={item} />;
             }
             return (
               <div
@@ -264,11 +259,7 @@ export const ComposerActivityStrip = function ComposerActivityStrip({
 
 // Background command rows carry no identity, so their kind icon replaces the
 // subagent avatar next to the status dot.
-function BackgroundActivityRow({
-  item,
-}: {
-  item: ComposerActivityStripBackgroundItem;
-}) {
+function BackgroundActivityRow({ item }: { item: ComposerActivityStripBackgroundItem }) {
   const KindIcon = TerminalIcon;
   const content = (
     <>

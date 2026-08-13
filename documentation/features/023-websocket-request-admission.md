@@ -15,20 +15,20 @@ tags: [websocket, admission, concurrency, file-preview, companion]
 
 ### Files
 
-| Type | Path | Purpose |
-| --- | --- | --- |
-| Admission | `apps/server/src/wsRequestAdmission.ts` | Classifies requests, applies per-client limits, and releases leases on completion or interruption. |
-| Middleware | `apps/server/src/wsRpc.ts` | Wraps non-stream RPC handlers with the admission guard. |
-| Test | `apps/server/src/wsRequestAdmission.test.ts` | Covers class limits, independent control capacity, failed work, and interruption cleanup. |
-| Client call sites | `apps/web/src/lib/projectReactQuery.ts`, `apps/web/src/components/settings/CompanionSettingsPanel.tsx` | File reads and Companion model discovery that use the expensive-read lane. |
+| Type              | Path                                                                                                   | Purpose                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Admission         | `apps/server/src/wsRequestAdmission.ts`                                                                | Classifies requests, applies per-client limits, and releases leases on completion or interruption. |
+| Middleware        | `apps/server/src/wsRpc.ts`                                                                             | Wraps non-stream RPC handlers with the admission guard.                                            |
+| Test              | `apps/server/src/wsRequestAdmission.test.ts`                                                           | Covers class limits, independent control capacity, failed work, and interruption cleanup.          |
+| Client call sites | `apps/web/src/lib/projectReactQuery.ts`, `apps/web/src/components/settings/CompanionSettingsPanel.tsx` | File reads and Companion model discovery that use the expensive-read lane.                         |
 
 ### Request classes and limits
 
-| Class | Limit | Examples |
-| --- | ---: | --- |
-| `control` | 16 | Terminal writes and acknowledgements, command dispatch, cancellation. |
-| `standard` | 12 | Lightweight reads and ordinary RPCs. |
-| `expensive-read` | 10 | File previews, workspace searches, Git diffs, provider model discovery, diagnostics. |
+| Class            | Limit | Examples                                                                             |
+| ---------------- | ----: | ------------------------------------------------------------------------------------ |
+| `control`        |    16 | Terminal writes and acknowledgements, command dispatch, cancellation.                |
+| `standard`       |    12 | Lightweight reads and ordinary RPCs.                                                 |
+| `expensive-read` |    10 | File previews, workspace searches, Git diffs, provider model discovery, diagnostics. |
 
 The limit is per WebSocket client. A client can use all ten expensive-read leases without consuming control capacity. A request over the class limit fails with `RPC_EXPENSIVE_READ_CAPACITY_EXCEEDED`, marked retryable with a 250 ms retry hint.
 

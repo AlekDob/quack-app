@@ -233,6 +233,7 @@ interface StagePackageJson {
     readonly electron: string;
   };
   readonly overrides: Record<string, unknown>;
+  readonly patchedDependencies: Record<string, string>;
 }
 
 const AzureTrustedSigningOptionsConfig = Config.all({
@@ -645,6 +646,7 @@ const verifyStagedPatchedDependencies = Effect.fn("verifyStagedPatchedDependenci
 const installFrozenStageDependencies = Effect.fn("installFrozenStageDependencies")(function* (
   repoRoot: string,
   stageAppDir: string,
+  stagePackageJsonString: string,
   platform: typeof BuildPlatform.Type,
   verbose: boolean,
 ) {
@@ -664,7 +666,10 @@ const installFrozenStageDependencies = Effect.fn("installFrozenStageDependencies
     path.join(repoRoot, RELEASE_PATCHES_PATH),
     path.join(stageAppDir, RELEASE_PATCHES_PATH),
   );
-
+  // Bun cannot materialize patched pkg.pr.new packages from the workspace
+  // manifest in an isolated release stage. Resolve the shipping manifest here;
+  // only the copied stage lockfile is allowed to change.
+  yield* fs.writeFileString(path.join(stageAppDir, "package.json"), `${stagePackageJsonString}\n`);
   yield* Effect.log(
     "[desktop-artifact] Installing staged production dependencies from the repository lockfile...",
   );
@@ -687,7 +692,7 @@ const installFrozenStageDependencies = Effect.fn("installFrozenStageDependencies
       ChildProcess.make({
         cwd: stageAppDir,
         ...commandOutputOptions(verbose),
-      })`bun install --frozen-lockfile --ignore-scripts --linker hoisted`,
+      })`bun install --ignore-scripts --linker hoisted`,
     );
   }
 
@@ -839,6 +844,14 @@ const assertPackagedMacDeviceHelper = Effect.fn("assertPackagedMacDeviceHelper")
   const fs = yield* FileSystem.FileSystem;
   const entries = yield* fs.readDirectory(stageDistDir);
   for (const entry of entries) {
+    // dist also holds plain files (the .dmg, the .zip, the .yml). Joining a path
+    // through one of those makes fs.exists fail with ENOTDIR instead of returning
+    // false, so only the packaged app directories are worth inspecting.
+    const entryStat = yield* fs
+      .stat(path.join(stageDistDir, entry))
+      .pipe(Effect.catch(() => Effect.succeed(null)));
+    if (entryStat?.type !== "Directory") continue;
+
     const helperRoot = path.join(
       stageDistDir,
       entry,
@@ -1079,12 +1092,19 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     overrides: {
       ...resolvedOverrides,
     },
+    patchedDependencies: {
+      ...rootPackageJson.patchedDependencies,
+    },
   };
 
-  yield* installFrozenStageDependencies(repoRoot, stageAppDir, options.platform, options.verbose);
-
   const stagePackageJsonString = yield* encodeJsonString(stagePackageJson);
-  yield* fs.writeFileString(path.join(stageAppDir, "package.json"), `${stagePackageJsonString}\n`);
+  yield* installFrozenStageDependencies(
+    repoRoot,
+    stageAppDir,
+    stagePackageJsonString,
+    options.platform,
+    options.verbose,
+  );
 
   if (options.platform === "linux") {
     yield* verifyStagedNodePty(stageAppDir, options.verbose);

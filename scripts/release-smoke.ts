@@ -292,8 +292,13 @@ function verifyDesktopStageLockAuthority(): void {
   );
   assertContains(
     buildScript,
-    "bun install --frozen-lockfile --ignore-scripts --linker hoisted",
-    "Expected macOS and Linux desktop staging to install from the repository's frozen workspace lockfile.",
+    "bun install --ignore-scripts --linker hoisted",
+    "Expected macOS and Linux desktop staging to resolve the shipping manifest in its isolated stage.",
+  );
+  assertContains(
+    buildScript,
+    "patchedDependencies: {",
+    "Expected the isolated shipping manifest to retain the repository dependency patches.",
   );
   assertContains(
     buildScript,
