@@ -5,7 +5,7 @@ stack: React / Vite / TypeScript
 created: 2026-08-05
 startDate: 2026-08-05
 endDate:
-last_verified: 2026-08-05
+last_verified: 2026-08-13
 status: active
 tags: [subscriptions, event-router, thread-detail, shell, streaming]
 ---
@@ -42,3 +42,4 @@ tags: [subscriptions, event-router, thread-detail, shell, streaming]
 
 - `serverThreads` identity changes every stream tick must not enqueue a no-op reconcile on the serialized subscribe chain
 - Missing lease identity stability: new threads can miss the first snapshot until app restart rehydrates from SQLite
+- Sibling shell stream (`WsTransport.startStream`, `apps/web/src/wsTransport.ts`) had the inverse bug — an explicit `subscribeShell` no-op'd if the stream was already running, freezing the whole sidebar until a thread was opened. Fixed 2026-08-13, see `documentation/bugs/2026-08-13-shell-resubscribe-noop-stuck-notification.md`.

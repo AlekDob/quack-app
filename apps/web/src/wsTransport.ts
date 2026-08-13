@@ -633,6 +633,13 @@ export class WsTransport {
 
       if (method === ORCHESTRATION_WS_METHODS.subscribeShell) {
         this.shellSubscribed = true;
+        // An explicit subscribe must deliver a fresh snapshot: the caller resets
+        // its shell cursor first and buffers every event until one arrives.
+        // Starting on top of a still-running stream silently no-ops (see
+        // `startStream`), so the cursor would stay unset and the sidebar would
+        // freeze until the next stream restart. Mirrors the thread path's
+        // `forceRestart`.
+        await awaitWithAbort(this.stopStream("orchestration.shell"), abortScope.signal);
         this.resetStreamCapacityRetry("orchestration.shell");
         this.resetStreamCompletionRetry("orchestration.shell");
         this.startShellStream(client);

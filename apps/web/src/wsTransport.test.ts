@@ -1090,4 +1090,28 @@ describe("WsTransport", () => {
 
     expect(listener).not.toHaveBeenCalled();
   });
+
+  // ALE-18: subscribing while a shell stream was still running used to no-op, so
+  // the caller's reset shell cursor never got a snapshot and every sidebar
+  // update stayed buffered (stuck "working" status, late completion sound).
+  it("restarts an already-running shell stream on an explicit subscribe", async () => {
+    const calls: string[] = [];
+    const transport = Object.create(WsTransport.prototype) as WsTransport;
+    Object.assign(transport, {
+      getClient: () => Promise.resolve({}),
+      stopStream: (key: string) => {
+        calls.push(`stop:${key}`);
+        return Promise.resolve();
+      },
+      resetStreamCapacityRetry: () => undefined,
+      resetStreamCompletionRetry: () => undefined,
+      startShellStream: () => {
+        calls.push("start");
+      },
+    });
+
+    await transport.request(ORCHESTRATION_WS_METHODS.subscribeShell, {});
+
+    expect(calls).toEqual(["stop:orchestration.shell", "start"]);
+  });
 });
