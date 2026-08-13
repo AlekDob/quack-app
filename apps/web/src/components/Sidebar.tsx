@@ -1819,10 +1819,22 @@ export default function Sidebar() {
     if (!pendingSidebarDraft) {
       return;
     }
-    // The placeholder is useful only when it is visible. Opening the destination
-    // project also makes creating a chat from a collapsed folder feel immediate.
+    // The placeholder is useful only when it is visible. Home chats live in the
+    // separate Chats disclosure, not in a project folder.
+    if (
+      isHomeChatContainerProject(projectById.get(pendingSidebarDraft.projectId), {
+        homeDir,
+        chatWorkspaceRoot,
+      })
+    ) {
+      setChatSectionExpanded(true);
+      return;
+    }
+
+    // Opening the destination project makes creating a thread from a collapsed
+    // folder feel immediate.
     setProjectExpanded(pendingSidebarDraft.projectId, true);
-  }, [pendingSidebarDraft, setProjectExpanded]);
+  }, [chatWorkspaceRoot, homeDir, pendingSidebarDraft, projectById, setProjectExpanded]);
   // Same predicate the Studio collectors use — trusting `kind` alone here would let a drifted
   // studio-kind row (root outside the configured Studio root) activate the Studio segment while
   // every Studio list excludes it, stranding the active thread in neither segment.

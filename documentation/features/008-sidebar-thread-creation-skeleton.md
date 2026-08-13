@@ -5,7 +5,7 @@ stack: React / Vite / TypeScript
 created: 2026-08-05
 startDate: 2026-08-05
 endDate:
-last_verified: 2026-08-05
+last_verified: 2026-08-13
 status: active
 tags: [sidebar, threads, drafts, loading, codex, skeleton]
 ---
@@ -40,7 +40,7 @@ New conversations are intentionally staged as local composer drafts before the p
 - The placeholder is shown only while a creation is really in flight: the send was submitted (`pendingSendStore`) or `thread.create` already went out (`promotedTo`) and only the server summary is missing. An open draft the user has not sent yet renders nothing — otherwise an empty shimmer row hangs under the project for as long as the draft stays open.
 - It is scoped to the active route's draft; stale drafts in local storage do not create phantom loading rows across the sidebar.
 - It uses the shared `Skeleton` primitive and the existing sidebar row geometry, so it does not shift neighboring rows when the real thread arrives.
-- The destination project is expanded automatically while the draft is pending, including when creation started from a collapsed project.
+- The destination project is expanded automatically while the draft is pending, including when creation started from a collapsed project. Home chats are handled separately: the `Chats` disclosure is opened because the Home container is not rendered as a project folder.
 - Home Chats receives the same treatment as project-nested conversations.
 - Once `sidebarThreadSummaryById` contains the thread, the placeholder disappears without a timer or polling loop.
 - The row exposes `role="status"`, `aria-live="polite"`, and an accessible creation label while remaining non-interactive.
@@ -48,4 +48,4 @@ New conversations are intentionally staged as local composer drafts before the p
 ### Verification
 
 - `bun run test -- src/components/Sidebar.logic.test.ts` from `apps/web`
-- Result: 1 file passed, 108 tests passed.
+- Result: 1 file passed, 111 tests passed.
