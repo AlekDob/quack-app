@@ -5,6 +5,7 @@ import {
   DEFAULT_MODEL_BY_PROVIDER,
   EventId,
   MessageId,
+  type LinearIssue,
   type ModelSelection,
   type ProjectScript,
   type ModelSlug,
@@ -86,7 +87,12 @@ import {
   supportsThreadCompaction,
 } from "~/lib/providerDiscoveryReactQuery";
 import { projectSearchEntriesQueryOptions } from "~/lib/projectReactQuery";
-import { serverConfigQueryOptions, serverQueryKeys } from "~/lib/serverReactQuery";
+import { linearIssuesQueryOptions } from "~/lib/linearReactQuery";
+import {
+  serverConfigQueryOptions,
+  serverQueryKeys,
+  serverSettingsQueryOptions,
+} from "~/lib/serverReactQuery";
 import { useRefreshProviderStatusesNow } from "~/hooks/useProviderStatusRefresh";
 import { SINGLE_CHAT_PANE_SCOPE_ID } from "~/lib/chatPaneScope";
 import {
@@ -297,6 +303,7 @@ import {
 } from "../pendingUserInput";
 import { selectRightDockState, useRightDockStore } from "../rightDockStore";
 import { useStore } from "../store";
+import { LinearCreateIssueDialog } from "./chat/LinearCreateIssueDialog";
 import { RenameThreadDialog } from "./RenameThreadDialog";
 import { getThreadFromState } from "../threadDerivation";
 import { useWorkspacePathsStore } from "../workspacePathsStore";
@@ -3270,6 +3277,15 @@ export default function ChatView({
     (debouncerState) => ({ isPending: debouncerState.isPending }),
   );
   const effectiveMentionQuery = mentionTriggerQuery.length > 0 ? debouncedPathQuery : "";
+  // Linear issues only load while an `@` menu is open and a key is configured.
+  const serverSettingsQuery = useQuery(serverSettingsQueryOptions());
+  const isLinearConnected = serverSettingsQuery.data?.linear.apiKeyConfigured ?? false;
+  const linearIssuesQuery = useQuery(
+    linearIssuesQueryOptions({
+      query: effectiveMentionQuery,
+      enabled: isLinearConnected && isMentionTrigger,
+    }),
+  );
   const composerSkillCwd = providerModelDiscoveryCwd;
   const providerComposerCapabilitiesQuery = useQuery(
     providerComposerCapabilitiesQueryOptions(selectedProvider),
@@ -3459,6 +3475,8 @@ export default function ChatView({
       projects: composerThreadProjects,
       currentThreadId: threadId,
     },
+    linearIssues: linearIssuesQuery.data ?? [],
+    linearConnected: isLinearConnected,
   });
   const composerMenuItems = useMemo(() => {
     if (composerCommandPicker === "fork-target") {
@@ -7028,6 +7046,7 @@ export default function ChatView({
   // See `LateComposerSendHandlers`: declared here so both `dispatchQueuedComposerTurn` (above)
   // and `onSend` (below) can reach handlers that are only declared further down.
   const lateComposerSendHandlersRef = useRef<LateComposerSendHandlers | null>(null);
+  const sendHandlersByThreadRef = useRef(new Map<ThreadId, LateComposerSendHandlers>());
 
   const runSend = async (
     e?: { preventDefault: () => void },
@@ -8839,8 +8858,14 @@ export default function ChatView({
   );
 
   const dispatchQueuedComposerTurn = useCallback(
-    async (queuedTurn: QueuedComposerTurn, dispatchMode: "queue" | "steer"): Promise<boolean> => {
-      const lateSendHandlers = lateComposerSendHandlersRef.current;
+    async (
+      queuedTurn: QueuedComposerTurn,
+      dispatchMode: "queue" | "steer",
+      // Handoff sends pass the handlers captured for their own thread; see the
+      // queue handoff effect.
+      handlers?: LateComposerSendHandlers,
+    ): Promise<boolean> => {
+      const lateSendHandlers = handlers ?? lateComposerSendHandlersRef.current;
       if (!lateSendHandlers) {
         return false;
       }
@@ -9024,6 +9049,43 @@ export default function ChatView({
     removeQueuedComposerTurnFromDraft,
     threadId,
   ]);
+
+  // Queued composer turns are drained by the effect above, which only runs while
+  // this thread's ChatView is mounted — close the thread and the queue freezes
+  // until it is reopened (ALE-29). Hand the queue over to the server's durable
+  // queue on the way out: `dispatchMode: "queue"` makes the provider command
+  // reactor promote each turn when the live turn settles, with no UI attached.
+  // The send handlers ref is intentionally never cleared on unmount, so the
+  // dispatch still completes after this component is gone.
+  useEffect(
+    () => () => {
+      const pendingQueue = queuedComposerTurnsRef.current;
+      const handlers = sendHandlersByThreadRef.current.get(threadId);
+      sendHandlersByThreadRef.current.delete(threadId);
+      if (pendingQueue.length === 0 || !handlers) {
+        return;
+      }
+      // The first entry may already be mid-dispatch from the drain effect; it is
+      // removed from the draft only after that send succeeds, so re-sending it
+      // here would duplicate the turn.
+      const handoffQueue = autoDispatchingQueuedTurnRef.current
+        ? pendingQueue.slice(1)
+        : pendingQueue;
+      void (async () => {
+        for (const queuedTurn of handoffQueue) {
+          // Sequential: each send waits on the previous one's in-flight guard,
+          // and the server queue preserves the order it receives them in.
+          const succeeded = await dispatchQueuedComposerTurn(queuedTurn, "queue", handlers);
+          if (!succeeded) {
+            // Leave the rest in the draft store; reopening the thread drains it.
+            return;
+          }
+          removeQueuedComposerTurnFromDraft(threadId, queuedTurn.id);
+        }
+      })();
+    },
+    [dispatchQueuedComposerTurn, removeQueuedComposerTurnFromDraft, threadId],
+  );
 
   const onImplementPlanInNewThread = useCallback(async () => {
     const api = readNativeApi();
@@ -9923,8 +9985,50 @@ export default function ChatView({
       advanceActivePendingUserInput: onAdvanceActivePendingUserInput,
       handleStandaloneSlashCommand,
     };
+    // Keyed by thread as well: this pane keeps the same ChatView instance across
+    // thread switches, so the queue handoff below (which runs after the switch has
+    // already refreshed the ref) would otherwise send the old thread's queued
+    // turns through the new thread's send path.
+    sendHandlersByThreadRef.current.set(threadId, lateComposerSendHandlersRef.current);
   });
 
+  // Holds the prefilled title while the "New Linear issue" dialog is open.
+  const [linearCreateDraftTitle, setLinearCreateDraftTitle] = useState<string | null>(null);
+  // Picking a Linear issue only retitles the chat: `ALE-28 Integrazione linear`.
+  // Nothing is inserted into the prompt and nothing is written back to Linear.
+  const renameThreadToLinearIssue = useCallback(
+    (issue: LinearIssue) => {
+      if (!activeThread) return;
+      void dispatchThreadRename({
+        threadId: activeThread.id,
+        newTitle: `${issue.identifier} ${issue.title}`,
+        unchangedTitles: [activeThread.title],
+        createIfMissing: isLocalDraftThread
+          ? {
+              projectId: activeThread.projectId,
+              modelSelection: activeThread.modelSelection,
+              runtimeMode: activeThread.runtimeMode,
+              interactionMode: activeThread.interactionMode,
+              envMode: activeThread.envMode ?? "local",
+              branch: activeThread.branch,
+              worktreePath: activeThread.worktreePath,
+              workingDirectory: activeThread.workingDirectory ?? null,
+              ...(activeThread.lastKnownPr !== undefined
+                ? { lastKnownPr: activeThread.lastKnownPr }
+                : {}),
+              createdAt: activeThread.createdAt,
+            }
+          : undefined,
+      }).catch((error: unknown) => {
+        toastManager.add({
+          type: "error",
+          title: "Failed to rename thread",
+          description: error instanceof Error ? error.message : "An error occurred.",
+        });
+      });
+    },
+    [activeThread, isLocalDraftThread],
+  );
   const onSelectComposerItem = useCallback(
     (item: ComposerCommandItem) => {
       if (composerSelectLockRef.current) return;
@@ -10019,6 +10123,16 @@ export default function ChatView({
         applyComposerTriggerReplacement({ snapshot, trigger, base: "" });
         return;
       }
+      if (item.type === "linear-issue") {
+        applyComposerTriggerReplacement({ snapshot, trigger, base: "" });
+        renameThreadToLinearIssue(item.issue);
+        return;
+      }
+      if (item.type === "linear-create") {
+        applyComposerTriggerReplacement({ snapshot, trigger, base: "" });
+        setLinearCreateDraftTitle(item.title);
+        return;
+      }
       if (item.type === "agent") {
         // Insert @alias() and position cursor inside the parentheses.
         applyComposerTriggerReplacement({
@@ -10043,6 +10157,7 @@ export default function ChatView({
       updateSelectedComposerMentions,
       updateSelectedComposerSkills,
       resolveActiveComposerTrigger,
+      renameThreadToLinearIssue,
     ],
   );
   const onComposerMenuItemHighlighted = useCallback((itemId: string | null) => {
@@ -10072,7 +10187,9 @@ export default function ChatView({
         workspaceEntriesQuery.isLoading ||
         workspaceEntriesQuery.isFetching ||
         providerPluginsQuery.isLoading ||
-        providerPluginsQuery.isFetching)) ||
+        providerPluginsQuery.isFetching ||
+        linearIssuesQuery.isLoading ||
+        linearIssuesQuery.isFetching)) ||
     (composerTriggerKind === "slash-command" &&
       (providerCommandsQuery.isLoading ||
         providerCommandsQuery.isFetching ||
@@ -11602,6 +11719,11 @@ export default function ChatView({
         currentTitle={activeThread.title}
         onOpenChange={setRenameDialogOpen}
         onSave={handleRenameActiveThread}
+      />
+      <LinearCreateIssueDialog
+        draftTitle={linearCreateDraftTitle}
+        onClose={() => setLinearCreateDraftTitle(null)}
+        onCreated={renameThreadToLinearIssue}
       />
       {automationDraftForm ? (
         <AutomationDialog

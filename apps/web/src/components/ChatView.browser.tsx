@@ -4579,8 +4579,12 @@ describe("ChatView timeline estimator parity (full app)", () => {
     }
   });
 
-  it("keeps queued follow-ups when you switch threads and come back", async () => {
-    useComposerDraftStore.getState().setPrompt(THREAD_ID, "queue survives thread switch");
+  // ALE-29: the local queue is drained by a mounted ChatView, so leaving the thread
+  // used to freeze it until the thread was reopened. Leaving now hands it to the
+  // server's durable queue, which promotes it when the live turn settles.
+  it("hands queued follow-ups to the server queue when you switch threads", async () => {
+    const queuedPrompt = "queue survives thread switch";
+    useComposerDraftStore.getState().setPrompt(THREAD_ID, queuedPrompt);
 
     const mounted = await mountChatView({
       viewport: DEFAULT_VIEWPORT,
@@ -4603,21 +4607,43 @@ describe("ChatView timeline estimator parity (full app)", () => {
       await vi.waitFor(
         () => {
           expect(document.querySelectorAll('[data-testid="queued-follow-up-row"]')).toHaveLength(1);
-          expect(document.body.textContent).toContain("queue survives thread switch");
+          expect(document.body.textContent).toContain(queuedPrompt);
         },
         { timeout: 8_000, interval: 16 },
       );
 
+      wsRequests.length = 0;
       await mounted.router.navigate({
         to: "/$threadId",
         params: { threadId: OTHER_THREAD_ID },
       });
       await waitForLayout();
 
+      // The queued turn is dispatched for its own thread with dispatchMode "queue",
+      // and leaves the local queue so reopening the thread cannot resend it.
       await vi.waitFor(
         () => {
           expect(mounted.router.state.location.pathname).toBe(`/${OTHER_THREAD_ID}`);
-          expect(document.querySelectorAll('[data-testid="queued-follow-up-row"]')).toHaveLength(0);
+          const handoffRequest = wsRequests.find((request) => {
+            const command = readDispatchedCommand(request);
+            return (
+              command?.type === "thread.turn.start" &&
+              "threadId" in command &&
+              command.threadId === THREAD_ID &&
+              "dispatchMode" in command &&
+              command.dispatchMode === "queue" &&
+              "message" in command &&
+              typeof command.message === "object" &&
+              command.message !== null &&
+              "text" in command.message &&
+              typeof command.message.text === "string" &&
+              command.message.text.includes(queuedPrompt)
+            );
+          });
+          expect(handoffRequest).toBeTruthy();
+          expect(
+            useComposerDraftStore.getState().draftsByThreadId[THREAD_ID]?.queuedTurns ?? [],
+          ).toHaveLength(0);
         },
         { timeout: 8_000, interval: 16 },
       );
@@ -4631,8 +4657,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
       await vi.waitFor(
         () => {
           expect(mounted.router.state.location.pathname).toBe(`/${THREAD_ID}`);
-          expect(document.querySelectorAll('[data-testid="queued-follow-up-row"]')).toHaveLength(1);
-          expect(document.body.textContent).toContain("queue survives thread switch");
+          expect(document.querySelectorAll('[data-testid="queued-follow-up-row"]')).toHaveLength(0);
         },
         { timeout: 8_000, interval: 16 },
       );
