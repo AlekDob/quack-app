@@ -1,4 +1,5 @@
 import type {
+  LinearIssue,
   ProjectEntry,
   ProviderAgentDescriptor,
   ProviderNativeCommandDescriptor,
@@ -258,6 +259,9 @@ export function useComposerCommandMenuItems(input: {
     readonly projects: readonly Project[];
     readonly currentThreadId: string | null;
   };
+  // Fetched by the caller (React Query); absent when Linear is not connected.
+  linearIssues?: readonly LinearIssue[];
+  linearConnected?: boolean;
 }): ComposerCommandItem[] {
   const {
     composerTrigger,
@@ -276,6 +280,8 @@ export function useComposerCommandMenuItems(input: {
     surfaceAppSlashCommands,
     dynamicAgents,
     threadMentionSources,
+    linearIssues,
+    linearConnected,
   } = input;
 
   if (!composerTrigger) return [];
@@ -353,9 +359,36 @@ export function useComposerCommandMenuItems(input: {
           query: composerTrigger.query,
         })
       : [];
+    // Linear is server-filtered, so the raw list is shown as-is; the last row always
+    // offers creating the ticket the user is evidently looking for.
+    const linearItems: ComposerCommandItem[] = linearConnected
+      ? [
+          ...(linearIssues ?? []).map((issue) => ({
+            id: `linear-issue:${issue.id}`,
+            type: "linear-issue" as const,
+            issue,
+            label: `${issue.identifier} ${issue.title}`,
+            description: issue.projectName ?? "",
+          })),
+          {
+            id: "linear-create",
+            type: "linear-create" as const,
+            title: composerTrigger.query.trim(),
+            label: "New Linear issue",
+            description: "Create a ticket and rename this chat",
+          },
+        ]
+      : [];
     // Keep mention suggestions ordered by primary intent: plugins and chats
     // first, then local context, then subagent delegation targets.
-    return [...pluginItems, ...threadItems, ...localRootItems, ...pathItems, ...agentItems];
+    return [
+      ...pluginItems,
+      ...threadItems,
+      ...localRootItems,
+      ...pathItems,
+      ...agentItems,
+      ...linearItems,
+    ];
   }
 
   if (composerTrigger.kind === "slash-command") {

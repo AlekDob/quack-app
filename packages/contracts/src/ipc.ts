@@ -20,6 +20,12 @@ import type {
   ExternalMcpRevokeIntegrationInput,
 } from "./externalMcp";
 import type {
+  LinearCreateIssueInput,
+  LinearCreateOptions,
+  LinearIssue,
+  LinearSearchIssuesInput,
+} from "./linear";
+import type {
   AutomationCancelRunInput,
   AutomationCancelRunResult,
   AutomationArchiveRunInput,
@@ -796,6 +802,11 @@ export interface NativeApi {
       input: ServerVoiceTranscriptionInput,
     ) => Promise<ServerVoiceTranscriptionResult>;
     upsertKeybinding: (input: ServerUpsertKeybindingInput) => Promise<ServerUpsertKeybindingResult>;
+  };
+  linear: {
+    searchIssues: (input: LinearSearchIssuesInput) => Promise<ReadonlyArray<LinearIssue>>;
+    listCreateOptions: () => Promise<LinearCreateOptions>;
+    createIssue: (input: LinearCreateIssueInput) => Promise<LinearIssue>;
   };
   stats: {
     getProfileStats: (input: StatsGetProfileStatsInput) => Promise<StatsGetProfileStatsResult>;

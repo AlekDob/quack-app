@@ -31,6 +31,12 @@ import {
   ExternalMcpRevokeIntegrationInput,
 } from "./externalMcp";
 import {
+  LinearCreateIssueInput,
+  LinearCreateOptions,
+  LinearIssue,
+  LinearSearchIssuesInput,
+} from "./linear";
+import {
   DEVICE_WS_METHODS,
   DeviceAttachInput,
   DeviceBootInput,
@@ -950,6 +956,24 @@ export const WsServerRefreshExternalMcpPairingRpc = Rpc.make(
   },
 );
 
+export const WsLinearSearchIssuesRpc = Rpc.make(WS_METHODS.linearSearchIssues, {
+  payload: LinearSearchIssuesInput,
+  success: Schema.Array(LinearIssue),
+  error: WsRpcError,
+});
+
+export const WsLinearListCreateOptionsRpc = Rpc.make(WS_METHODS.linearListCreateOptions, {
+  payload: Schema.Struct({}),
+  success: LinearCreateOptions,
+  error: WsRpcError,
+});
+
+export const WsLinearCreateIssueRpc = Rpc.make(WS_METHODS.linearCreateIssue, {
+  payload: LinearCreateIssueInput,
+  success: LinearIssue,
+  error: WsRpcError,
+});
+
 export const WsServerListWorktreesRpc = Rpc.make(WS_METHODS.serverListWorktrees, {
   payload: Schema.Struct({}),
   success: ServerListWorktreesResult,
@@ -1291,6 +1315,9 @@ export const WsFeatureRpcGroup = RpcGroup.make(
   WsServerCreateExternalMcpIntegrationRpc,
   WsServerRevokeExternalMcpIntegrationRpc,
   WsServerRefreshExternalMcpPairingRpc,
+  WsLinearSearchIssuesRpc,
+  WsLinearListCreateOptionsRpc,
+  WsLinearCreateIssueRpc,
   WsServerListWorktreesRpc,
   WsServerListLocalServersRpc,
   WsServerStopLocalServerRpc,

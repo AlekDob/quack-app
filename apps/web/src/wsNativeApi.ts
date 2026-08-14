@@ -720,6 +720,11 @@ export function createWsNativeApi(): NativeApi {
       },
       upsertKeybinding: (input) => transport.request(WS_METHODS.serverUpsertKeybinding, input),
     },
+    linear: {
+      searchIssues: (input) => transport.request(WS_METHODS.linearSearchIssues, input),
+      listCreateOptions: () => transport.request(WS_METHODS.linearListCreateOptions),
+      createIssue: (input) => transport.request(WS_METHODS.linearCreateIssue, input),
+    },
     stats: {
       getProfileStats: (input) => transport.request(WS_METHODS.statsGetProfileStats, input),
       getProfileTokenStats: (input) =>

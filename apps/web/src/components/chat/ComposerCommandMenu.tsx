@@ -1,4 +1,5 @@
 import {
+  type LinearIssue,
   type ProjectEntry,
   type ModelSlug,
   type ProviderNativeCommandDescriptor,
@@ -27,6 +28,7 @@ import {
   MessageCircleIcon,
   Minimize2,
   PluginIcon,
+  PlusIcon,
   SkillCubeIcon,
   TemporaryThreadIcon,
   TerminalIcon,
@@ -108,6 +110,10 @@ function commandMenuTrailingMeta(item: ComposerCommandItem): string | null {
     return "Local";
   }
 
+  if (item.type === "linear-issue") {
+    return item.issue.stateName;
+  }
+
   if (item.type === "skill") {
     return formatSkillScope(item.skill.scope);
   }
@@ -142,7 +148,9 @@ function commandMenuSecondaryText(item: ComposerCommandItem): string | null {
     item.type === "plugin" ||
     item.type === "skill" ||
     item.type === "local-root" ||
-    item.type === "thread"
+    item.type === "thread" ||
+    item.type === "linear-issue" ||
+    item.type === "linear-create"
   ) {
     return item.description;
   }
@@ -235,6 +243,20 @@ export type ComposerCommandItem =
       color: string;
       label: string;
       description: string;
+    }
+  | {
+      id: string;
+      type: "linear-issue";
+      issue: LinearIssue;
+      label: string;
+      description: string;
+    }
+  | {
+      id: string;
+      type: "linear-create";
+      title: string;
+      label: string;
+      description: string;
     };
 
 type ComposerCommandGroupModel = {
@@ -256,13 +278,18 @@ export function groupCommandItems(
     const threadItems = items.filter((item) => item.type === "thread");
     const localItems = items.filter((item) => item.type === "local-root" || item.type === "path");
     const agentItems = items.filter((item) => item.type === "agent");
+    const linearItems = items.filter(
+      (item) => item.type === "linear-issue" || item.type === "linear-create",
+    );
     const otherItems = items.filter(
       (item) =>
         item.type !== "plugin" &&
         item.type !== "thread" &&
         item.type !== "local-root" &&
         item.type !== "path" &&
-        item.type !== "agent",
+        item.type !== "agent" &&
+        item.type !== "linear-issue" &&
+        item.type !== "linear-create",
     );
 
     const groups: ComposerCommandGroupModel[] = [];
@@ -277,6 +304,9 @@ export function groupCommandItems(
     }
     if (agentItems.length > 0) {
       groups.push({ id: "subagents", label: "Subagents", items: agentItems });
+    }
+    if (linearItems.length > 0) {
+      groups.push({ id: "linear", label: "Linear", items: linearItems });
     }
     if (otherItems.length > 0) {
       groups.push({ id: "other", label: null, items: otherItems });
@@ -513,6 +543,10 @@ function commandMenuItemGlyph(item: ComposerCommandItem, theme: "light" | "dark"
       return <ProviderIcon provider={item.provider} className={cls} />;
     case "skill":
       return <SkillCubeIcon className={cls} />;
+    case "linear-issue":
+      return <ListTodoIcon className={cls} />;
+    case "linear-create":
+      return <PlusIcon className={cls} />;
     default:
       return null;
   }

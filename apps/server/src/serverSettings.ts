@@ -33,7 +33,10 @@ import {
 } from "effect";
 import * as Semaphore from "effect/Semaphore";
 import { writeFileStringAtomically } from "./atomicWrite";
+import { ServerSecretStoreLive } from "./auth/Layers/ServerSecretStore";
+import { ServerSecretStore } from "./auth/Services/ServerSecretStore";
 import { ServerConfig } from "./config";
+import { isLinearApiKeyConfigured, writeLinearApiKey } from "./linear/linearCredentials";
 import {
   ProviderCredentials,
   ProviderCredentialsLive,
@@ -193,12 +196,13 @@ function readLegacyProviderPasswords(raw: string): ReadonlyMap<ExternalProviderS
   }
 }
 
-function omitProviderPasswords(patch: ServerSettingsPatch): ServerSettingsPatch {
-  if (!patch.providers) return patch;
+function omitSecrets(patch: ServerSettingsPatch): ServerSettingsPatch {
+  const { linear: _linear, ...rest } = patch;
+  if (!patch.providers) return rest;
   const { serverPassword: _kiloPassword, ...kilo } = patch.providers.kilo ?? {};
   const { serverPassword: _openCodePassword, ...opencode } = patch.providers.opencode ?? {};
   return {
-    ...patch,
+    ...rest,
     providers: {
       ...patch.providers,
       ...(patch.providers.kilo ? { kilo } : {}),
@@ -244,6 +248,7 @@ function decodeSettingsFromJson(settingsPath: string, raw: string) {
 const makeServerSettings = Effect.gen(function* () {
   const { settingsPath } = yield* ServerConfig;
   const providerCredentials = yield* ProviderCredentials;
+  const secrets = yield* ServerSecretStore;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const writeSemaphore = yield* Semaphore.make(1);
@@ -260,10 +265,12 @@ const makeServerSettings = Effect.gen(function* () {
     Effect.all({
       kilo: providerCredentials.isServerPasswordConfigured("kilo"),
       opencode: providerCredentials.isServerPasswordConfigured("opencode"),
+      linear: isLinearApiKeyConfigured(secrets),
     }).pipe(
       Effect.map(
         (configured): ServerSettings => ({
           ...settings,
+          linear: { apiKeyConfigured: configured.linear },
           providers: {
             ...settings.providers,
             kilo: {
@@ -432,11 +439,19 @@ const makeServerSettings = Effect.gen(function* () {
             );
           }
         }
-        const normalized = yield* normalizeSettings(
-          settingsPath,
-          current,
-          omitProviderPasswords(patch),
-        );
+        if (patch.linear?.apiKey !== undefined) {
+          yield* writeLinearApiKey(secrets, patch.linear.apiKey).pipe(
+            Effect.mapError(
+              (cause) =>
+                new ServerSettingsError({
+                  settingsPath,
+                  detail: "failed to update Linear API key",
+                  cause,
+                }),
+            ),
+          );
+        }
+        const normalized = yield* normalizeSettings(settingsPath, current, omitSecrets(patch));
         const next = yield* withCredentialState(normalized);
         const nextRevision = Math.max(disk.revision, yield* Ref.get(revisionRef)) + 1;
         yield* writeSettingsAtomically({
@@ -479,4 +494,5 @@ const makeServerSettings = Effect.gen(function* () {
 
 export const ServerSettingsLive = Layer.effect(ServerSettingsService, makeServerSettings).pipe(
   Layer.provide(ProviderCredentialsLive),
+  Layer.provide(ServerSecretStoreLive),
 );

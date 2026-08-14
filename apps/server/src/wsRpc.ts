@@ -45,6 +45,7 @@ import {
   type AuthenticatedSession,
   type ServerAuthShape,
 } from "./auth/Services/ServerAuth";
+import { ServerSecretStore } from "./auth/Services/ServerSecretStore";
 import { SessionCredentialService } from "./auth/Services/SessionCredentialService";
 import { CheckpointDiffQuery } from "./checkpointing/Services/CheckpointDiffQuery";
 import { resolveThreadWorkspaceCwd } from "./checkpointing/Utils";
@@ -101,6 +102,12 @@ import { ProfileStatsQuery } from "./profileStats";
 import { redactSensitiveProcessArgs } from "./processArgumentRedaction";
 import { ServerEnvironment } from "./environment/Services/ServerEnvironment";
 import { ExternalMcpService } from "./externalMcp/Services/ExternalMcpService";
+import {
+  createLinearIssue,
+  listLinearCreateOptions,
+  searchLinearIssues,
+} from "./linear/linearClient";
+import { readLinearApiKey } from "./linear/linearCredentials";
 import { ServerLifecycleEvents } from "./serverLifecycleEvents";
 import { ServerRuntimeStartup } from "./serverRuntimeStartup";
 import { ServerSettingsService } from "./serverSettings";
@@ -354,6 +361,7 @@ const makeWsRpcHandlersLayer = () =>
       const runtimeStartup = yield* ServerRuntimeStartup;
       const serverEnvironment = yield* ServerEnvironment;
       const serverSettings = yield* ServerSettingsService;
+      const secretStore = yield* ServerSecretStore;
       const terminalManager = yield* TerminalManager;
       const teamRepository = yield* TeamRepository;
       const textGeneration = yield* TextGeneration;
@@ -782,6 +790,17 @@ const makeWsRpcHandlersLayer = () =>
 
       const rpcEffect = <A, E, R>(effect: Effect.Effect<A, E, R>, fallbackMessage: string) =>
         effect.pipe(Effect.mapError((cause) => toWsRpcError(cause, fallbackMessage)));
+
+      // Every Linear call needs the stored personal API key; without one the UI should say
+      // "connect Linear" rather than surface an opaque HTTP failure.
+      const withLinearApiKey = <A>(run: (apiKey: string) => Promise<A>) =>
+        readLinearApiKey(secretStore).pipe(
+          Effect.flatMap((apiKey) =>
+            apiKey
+              ? Effect.tryPromise({ try: () => run(apiKey), catch: (cause) => cause })
+              : Effect.fail(new Error("Connect Linear in Settings, Integrations first.")),
+          ),
+        );
 
       const requireExistingTeamScope = (scope: import("@synara/contracts").TeamScope) =>
         scope.kind === "global"
@@ -1585,6 +1604,21 @@ const makeWsRpcHandlersLayer = () =>
           rpcEffect(
             requireOwner.pipe(Effect.andThen(externalMcp.refreshPairing(input))),
             "Failed to refresh external MCP pairing",
+          ),
+        [WS_METHODS.linearSearchIssues]: (input) =>
+          rpcEffect(
+            withLinearApiKey((apiKey) => searchLinearIssues(apiKey, input.query ?? "")),
+            "Failed to search Linear issues",
+          ),
+        [WS_METHODS.linearListCreateOptions]: () =>
+          rpcEffect(
+            withLinearApiKey((apiKey) => listLinearCreateOptions(apiKey)),
+            "Failed to load Linear teams and projects",
+          ),
+        [WS_METHODS.linearCreateIssue]: (input) =>
+          rpcEffect(
+            withLinearApiKey((apiKey) => createLinearIssue(apiKey, input)),
+            "Failed to create the Linear issue",
           ),
         [WS_METHODS.serverListWorktrees]: () =>
           rpcEffect(

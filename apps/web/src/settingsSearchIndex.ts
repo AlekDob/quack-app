@@ -417,6 +417,12 @@ export const SETTINGS_SEARCH_ENTRIES: readonly SettingsSearchEntry[] = [
       "Pair Codex Claude and other local MCP clients with scoped project access. revoke credential task create wait read worktree approval",
   },
   {
+    id: "integrations:linear",
+    section: "integrations",
+    title: "API key",
+    keywords: "Linear issue ticket api key connect mention rename thread",
+  },
+  {
     id: "advanced:version",
     section: "advanced",
     title: "Version",
