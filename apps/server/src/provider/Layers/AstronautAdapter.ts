@@ -19,7 +19,18 @@ import {
   createAstronautSseParser,
 } from "../astronautRemote.ts";
 import { AstronautAdapter, type AstronautAdapterShape } from "../Services/AstronautAdapter.ts";
-import type { ProviderThreadSnapshot } from "../Services/ProviderAdapter.ts";
+import {
+  PROVIDER_ADAPTER_RUNTIME_EVENT_BUFFER_CAPACITY,
+  type ProviderThreadSnapshot,
+} from "../Services/ProviderAdapter.ts";
+import { makeBoundedCallbackIngress } from "../boundedCallbackIngress.ts";
+import {
+  compactProviderRuntimeEventForIngress,
+  isTerminalProviderRuntimeEvent,
+  PROVIDER_RUNTIME_CALLBACK_BUFFER_MAX_BYTES,
+  PROVIDER_RUNTIME_CALLBACK_TERMINAL_RESERVE,
+  providerRuntimeEventBytes,
+} from "../providerRuntimeEventIngress.ts";
 
 type JsonRecord = Record<string, unknown>;
 type AstronautContext = {
@@ -60,7 +71,19 @@ const remoteIdFromCursor = (cursor: unknown): string | undefined => {
 };
 
 export const makeAstronautAdapter = Effect.gen(function* () {
-  const queue = yield* Queue.unbounded<ProviderRuntimeEvent>();
+  const queue = yield* Queue.bounded<ProviderRuntimeEvent>(
+    PROVIDER_ADAPTER_RUNTIME_EVENT_BUFFER_CAPACITY,
+  );
+  const eventIngress = yield* makeBoundedCallbackIngress<ProviderRuntimeEvent, never, never>(
+    (event) => Queue.offer(queue, event).pipe(Effect.asVoid),
+    {
+      capacity: PROVIDER_ADAPTER_RUNTIME_EVENT_BUFFER_CAPACITY,
+      maxBufferedBytes: PROVIDER_RUNTIME_CALLBACK_BUFFER_MAX_BYTES,
+      terminalReserve: PROVIDER_RUNTIME_CALLBACK_TERMINAL_RESERVE,
+      isTerminal: isTerminalProviderRuntimeEvent,
+      sizeOf: providerRuntimeEventBytes,
+    },
+  );
   const sessions = new Map<ThreadId, AstronautContext>();
 
   const emit = (
@@ -69,16 +92,18 @@ export const makeAstronautAdapter = Effect.gen(function* () {
     payload: unknown,
     extra: Partial<ProviderRuntimeEvent> = {},
   ) => {
-    void Queue.offer(queue, {
-      eventId: eventId(),
-      provider: "astronaut",
-      threadId: context.session.threadId,
-      createdAt: now(),
-      ...(context.turnId ? { turnId: context.turnId } : {}),
-      type,
-      payload,
-      ...extra,
-    } as ProviderRuntimeEvent);
+    eventIngress.offer(
+      compactProviderRuntimeEventForIngress({
+        eventId: eventId(),
+        provider: "astronaut",
+        threadId: context.session.threadId,
+        createdAt: now(),
+        ...(context.turnId ? { turnId: context.turnId } : {}),
+        type,
+        payload,
+        ...extra,
+      } as ProviderRuntimeEvent),
+    );
   };
   const error = (method: string, cause: unknown) =>
     new ProviderAdapterRequestError({
@@ -183,9 +208,15 @@ export const makeAstronautAdapter = Effect.gen(function* () {
           }
           const requestId = data.requestId ?? data.request_id ?? data.id;
           if (kind === "token" || kind === "text" || kind === "message")
-            emit(context, "content.delta", { streamKind: "assistant", delta: stringValue(value) });
+            emit(context, "content.delta", {
+              streamKind: "assistant_text",
+              delta: stringValue(value),
+            });
           else if (kind === "reasoning")
-            emit(context, "content.delta", { streamKind: "reasoning", delta: stringValue(value) });
+            emit(context, "content.delta", {
+              streamKind: "reasoning_text",
+              delta: stringValue(value),
+            });
           else if (kind === "tool")
             emit(context, "tool.progress", { detail: stringValue(value), data: value });
           else if (kind === "permission")

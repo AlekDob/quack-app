@@ -789,11 +789,66 @@ describe("applyCursorAcpModelSelection", () => {
     ]);
   });
 
-  it("maps Cursor's namespaced Grok CLI id to the unprefixed ACP model value", async () => {
+  it("maps Cursor's namespaced Grok CLI id to the unprefixed ACP model value without Fast", async () => {
     const calls: Array<
       | { readonly type: "model"; readonly value: string }
       | { readonly type: "config"; readonly configId: string; readonly value: string | boolean }
     > = [];
+
+    const runtime = {
+      getConfigOptions: Effect.succeed([
+        {
+          id: "model",
+          name: "Model",
+          category: "model",
+          type: "select",
+          currentValue: "default[]",
+          options: [
+            { value: "default[]", name: "Auto" },
+            {
+              value: "grok-4.5[effort=high,fast=false]",
+              name: "Cursor Grok 4.5",
+            },
+            {
+              value: "grok-4.5[effort=high,fast=true]",
+              name: "Cursor Grok 4.5 Fast",
+            },
+          ],
+        },
+      ] satisfies ReadonlyArray<Acp.SessionConfigOption>),
+      setModel: (value: string) =>
+        Effect.sync(() => {
+          calls.push({ type: "model", value });
+        }),
+      setConfigOption: (configId: string, value: string | boolean) =>
+        Effect.sync(() => {
+          calls.push({ type: "config", configId, value });
+        }),
+    };
+
+    await Effect.runPromise(
+      applyCursorAcpModelSelection({
+        runtime,
+        model: "cursor-grok-4.5",
+        options: { reasoningEffort: "high", fastMode: false },
+        mapError: ({ cause }) => cause,
+      }),
+    );
+
+    expect(calls).toEqual([
+      {
+        type: "model",
+        value: "grok-4.5[effort=high,fast=false]",
+      },
+    ]);
+  });
+
+  it("keeps Fast and notifies when Cursor only advertises the Fast Grok variant", async () => {
+    const calls: Array<
+      | { readonly type: "model"; readonly value: string }
+      | { readonly type: "config"; readonly configId: string; readonly value: string | boolean }
+    > = [];
+    const notices: Array<{ readonly reason: string; readonly message: string }> = [];
 
     const runtime = {
       getConfigOptions: Effect.succeed([
@@ -828,6 +883,10 @@ describe("applyCursorAcpModelSelection", () => {
         model: "cursor-grok-4.5",
         options: { reasoningEffort: "high", fastMode: false },
         mapError: ({ cause }) => cause,
+        onNotice: (notice) =>
+          Effect.sync(() => {
+            notices.push({ reason: notice.reason, message: notice.message });
+          }),
       }),
     );
 
@@ -837,6 +896,9 @@ describe("applyCursorAcpModelSelection", () => {
         value: "grok-4.5[effort=high,fast=true]",
       },
     ]);
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.reason).toBe("fast-forced");
+    expect(notices[0]?.message).toContain("only offers Fast");
   });
 
   it("keeps OpenAI CLI 1M context in the ACP model value so unsupported variants fail instead of falling back", async () => {

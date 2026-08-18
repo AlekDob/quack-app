@@ -27,6 +27,11 @@ export async function runCompanionConnectionTest(url: string): Promise<Companion
     provider: "astronaut",
     apiEndpoint: url,
   });
+  // A disabled provider short-circuits listModels to an empty list, which would
+  // otherwise read as "Connected · 0 models" while the composer says Unavailable.
+  if (result.source === "disabled") {
+    throw new Error("Companion is turned off. Enable it in Providers to use this connection.");
+  }
   return { models: result.models.length, ms: Math.round(performance.now() - startedAt) };
 }
 

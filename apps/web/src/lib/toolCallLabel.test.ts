@@ -6,6 +6,7 @@ import {
   deriveReadableToolTitle,
   deriveSynaraMcpToolTitle,
   extractWebFetchUrl,
+  isGenericToolTitle,
   isInspectCommand,
   isSynaraBrowserToolCall,
   normalizeCompactToolLabel,
@@ -352,6 +353,18 @@ describe("deriveReadableToolTitle", () => {
         payload: { data: { kind: "read" } },
       }),
     ).toBe("Read");
+  });
+
+  it("treats MCP: tool as a generic title", () => {
+    expect(isGenericToolTitle("MCP: tool")).toBe(true);
+    expect(isGenericToolTitle("mcp tool")).toBe(true);
+    expect(
+      deriveReadableToolTitle({
+        title: "MCP: tool",
+        fallbackLabel: "Tool",
+        itemType: "dynamic_tool_call",
+      }),
+    ).toBe("Tool");
   });
 
   it("formats MCP identifiers into readable tool names", () => {

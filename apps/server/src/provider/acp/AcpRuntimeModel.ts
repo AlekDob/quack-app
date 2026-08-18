@@ -321,7 +321,14 @@ function isProviderGenericToolTitle(title: string | undefined, kind: string | un
   if (!normalized) {
     return false;
   }
-  if (normalized === "tool" || normalized === "terminal" || normalized === "tool call") {
+  if (
+    normalized === "tool" ||
+    normalized === "terminal" ||
+    normalized === "tool call" ||
+    normalized === "mcp" ||
+    normalized === "mcp tool" ||
+    normalized === "mcp: tool"
+  ) {
     return true;
   }
   if (kind === "search" && normalized === "find") {
@@ -389,6 +396,19 @@ function deriveToolActivityPresentation(input: {
   return detail ? { summary, detail } : { summary };
 }
 
+function extractToolNameFromRawInput(rawInput: unknown): string | undefined {
+  if (!isRecord(rawInput)) {
+    return undefined;
+  }
+  for (const key of ["_toolName", "toolName", "name"] as const) {
+    const value = rawInput[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return undefined;
+}
+
 function makeToolCallState(
   input: {
     readonly toolCallId: string;
@@ -409,6 +429,7 @@ function makeToolCallState(
     return undefined;
   }
   const title = input.title?.trim() || undefined;
+  const toolName = extractToolNameFromRawInput(input.rawInput);
   const command = extractToolCallCommand(input.rawInput, title);
   const textContent = extractTextContentFromToolCallContent(input.content);
   const structuredContent = summarizeToolCallContent(input.content);
@@ -416,13 +437,18 @@ function makeToolCallState(
   const outputDetail = summarizeToolRawOutput(input.rawOutput);
   const status = normalizeToolCallStatus(input.status, options?.fallbackStatus);
   const kind = normalizeToolKind(input.kind) ?? inferToolKindFromProviderTitle(title);
-  const normalizedTitle =
-    title && title.toLowerCase() !== "terminal" && title.toLowerCase() !== "tool call"
+  const kindSpecificTitleIsGeneric = isProviderGenericToolTitle(title, kind);
+  const normalizedTitle = kindSpecificTitleIsGeneric
+    ? toolName
+    : title && title.toLowerCase() !== "terminal" && title.toLowerCase() !== "tool call"
       ? title
-      : undefined;
+      : toolName;
   const data: Record<string, unknown> = { toolCallId };
   if (kind) {
     data.kind = kind;
+  }
+  if (toolName) {
+    data.toolName = toolName;
   }
   if (command) {
     data.command = command;
@@ -439,7 +465,6 @@ function makeToolCallState(
   if (input.locations !== undefined) {
     data.locations = input.locations;
   }
-  const kindSpecificTitleIsGeneric = isProviderGenericToolTitle(title, kind);
   const fallbackDetail =
     command ??
     locationDetail ??
@@ -450,6 +475,7 @@ function makeToolCallState(
   const actionTitle = deriveGenericToolActionTitle(kind, status);
   const hasPresentationSeed =
     title !== undefined ||
+    toolName !== undefined ||
     kind !== undefined ||
     command !== undefined ||
     locationDetail !== undefined ||
@@ -463,7 +489,7 @@ function makeToolCallState(
         itemType,
         data,
         fallbackSummary: actionTitle ?? (itemType === "command_execution" ? "Ran command" : "Tool"),
-        ...(normalizedTitle !== undefined && !kindSpecificTitleIsGeneric
+        ...(normalizedTitle !== undefined
           ? { title: normalizedTitle }
           : actionTitle !== undefined
             ? { title: actionTitle }

@@ -7,6 +7,7 @@ import type { ChatAttachment, ChatImageAttachment, ProviderKind } from "@synara/
 import { Effect } from "effect";
 
 import { resolveProviderAttachmentPath } from "./providerAttachmentPaths.ts";
+import { downscalePromptImage } from "./promptImageDownscale.ts";
 import { ProviderAdapterRequestError } from "./Errors.ts";
 
 // Assistant selections stay in history as attachments, but the composer serializes them into text.
@@ -18,11 +19,16 @@ export function filterProviderPromptImageAttachments(
   );
 }
 
-export interface ProviderPromptImageBlock {
-  readonly type: "image";
-  readonly mimeType: string;
-  readonly data: string;
-}
+export type ProviderPromptImageBlock =
+  | {
+      readonly type: "image";
+      readonly mimeType: string;
+      readonly data: string;
+    }
+  | {
+      readonly type: "text";
+      readonly text: string;
+    };
 
 export function loadProviderPromptImageBlocks(input: {
   readonly attachments: ReadonlyArray<ChatAttachment> | undefined;
@@ -66,11 +72,20 @@ export function loadProviderPromptImageBlocks(input: {
               cause,
             }),
         ),
-        Effect.map((bytes) => ({
-          type: "image" as const,
-          mimeType: attachment.mimeType,
-          data: Buffer.from(bytes).toString("base64"),
-        })),
+        Effect.map((bytes) => {
+          const downscaled = downscalePromptImage(bytes, attachment.mimeType);
+          if (downscaled.kind === "omit") {
+            return {
+              type: "text" as const,
+              text: `Omitted image ${attachment.name}: could not downscale (${downscaled.reason}).`,
+            };
+          }
+          return {
+            type: "image" as const,
+            mimeType: downscaled.mimeType,
+            data: Buffer.from(downscaled.bytes).toString("base64"),
+          };
+        }),
       );
     },
     { concurrency: 4 },

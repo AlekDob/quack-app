@@ -33,23 +33,23 @@ giusto. Questa è indipendente — nessuna delle due tocca il codice dell'altra.
 
 ### File
 
-| Area      | File                                                          | Scopo                                                            |
-| --------- | -------------------------------------------------------------- | ----------------------------------------------------------------- |
-| Contratti | `packages/contracts/src/linear.ts`                             | `LinearIssue`, `LinearTeam`, `LinearProject`, `LinearCreateOptions`, input schemas |
-| Contratti | `packages/contracts/src/settings.ts`                            | `LinearServerSettings.apiKeyConfigured` in `ServerSettings`/patch |
-| Contratti | `packages/contracts/src/ws.ts`, `rpc.ts`, `ipc.ts`              | 3 metodi WS: `linear.searchIssues`, `linear.listCreateOptions`, `linear.createIssue` |
-| Server    | `apps/server/src/linear/linearCredentials.ts`                   | Legge/scrive la API key nel secret store (mai in `settings.json`) |
-| Server    | `apps/server/src/linear/linearClient.ts`                        | Client GraphQL minimale su `fetchJson`, origin pinnata `api.linear.app` |
-| Server    | `apps/server/src/linear/linearClient.test.ts`                   | Copre il filtro stato e la mappatura errori 401             |
-| Server    | `apps/server/src/serverSettings.ts`                             | Split segreto/patch, `withCredentialState` calcola `apiKeyConfigured` |
-| Server    | `apps/server/src/wsRpc.ts`                                      | Handler dei 3 metodi, `withLinearApiKey` per il messaggio "connetti Linear" |
-| Server    | `apps/server/src/wsRequestAdmission.ts`                         | `searchIssues`/`listCreateOptions` in `EXPENSIVE_READ_METHODS`    |
-| Web       | `apps/web/src/components/settings/LinearSettingsPanel.tsx`      | Campo API key in Settings → Integrations                          |
-| Web       | `apps/web/src/lib/linearReactQuery.ts`                          | Query options per issues/createOptions + `createLinearIssue`      |
-| Web       | `apps/web/src/hooks/useComposerCommandMenuItems.ts`             | Costruisce le voci `linear-issue`/`linear-create` del menu `@`    |
-| Web       | `apps/web/src/components/chat/ComposerCommandMenu.tsx`          | Icone, gruppo "Linear", testo secondario (stato/progetto)         |
-| Web       | `apps/web/src/components/chat/LinearCreateIssueDialog.tsx`      | Dialog titolo + select team + select progetto                     |
-| Web       | `apps/web/src/components/ChatView.tsx`                          | Query Linear, `renameThreadToLinearIssue`, selezione nel menu `@` |
+| Area      | File                                                       | Scopo                                                                                |
+| --------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Contratti | `packages/contracts/src/linear.ts`                         | `LinearIssue`, `LinearTeam`, `LinearProject`, `LinearCreateOptions`, input schemas   |
+| Contratti | `packages/contracts/src/settings.ts`                       | `LinearServerSettings.apiKeyConfigured` in `ServerSettings`/patch                    |
+| Contratti | `packages/contracts/src/ws.ts`, `rpc.ts`, `ipc.ts`         | 3 metodi WS: `linear.searchIssues`, `linear.listCreateOptions`, `linear.createIssue` |
+| Server    | `apps/server/src/linear/linearCredentials.ts`              | Legge/scrive la API key nel secret store (mai in `settings.json`)                    |
+| Server    | `apps/server/src/linear/linearClient.ts`                   | Client GraphQL minimale su `fetchJson`, origin pinnata `api.linear.app`              |
+| Server    | `apps/server/src/linear/linearClient.test.ts`              | Copre il filtro stato e la mappatura errori 401                                      |
+| Server    | `apps/server/src/serverSettings.ts`                        | Split segreto/patch, `withCredentialState` calcola `apiKeyConfigured`                |
+| Server    | `apps/server/src/wsRpc.ts`                                 | Handler dei 3 metodi, `withLinearApiKey` per il messaggio "connetti Linear"          |
+| Server    | `apps/server/src/wsRequestAdmission.ts`                    | `searchIssues`/`listCreateOptions` in `EXPENSIVE_READ_METHODS`                       |
+| Web       | `apps/web/src/components/settings/LinearSettingsPanel.tsx` | Campo API key in Settings → Integrations                                             |
+| Web       | `apps/web/src/lib/linearReactQuery.ts`                     | Query options per issues/createOptions + `createLinearIssue`                         |
+| Web       | `apps/web/src/hooks/useComposerCommandMenuItems.ts`        | Costruisce le voci `linear-issue`/`linear-create` del menu `@`                       |
+| Web       | `apps/web/src/components/chat/ComposerCommandMenu.tsx`     | Icone, gruppo "Linear", testo secondario (stato/progetto)                            |
+| Web       | `apps/web/src/components/chat/LinearCreateIssueDialog.tsx` | Dialog titolo + select team + select progetto                                        |
+| Web       | `apps/web/src/components/ChatView.tsx`                     | Query Linear, `renameThreadToLinearIssue`, selezione nel menu `@`                    |
 
 ### Flusso dati
 

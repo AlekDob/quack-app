@@ -496,11 +496,11 @@ export function deriveReadableToolTitle(input: ReadableToolTitleInput): string |
   if (normalizedFallback.length > 0 && !isGenericToolTitle(normalizedFallback)) {
     return normalizedFallback;
   }
-  if (normalizedTitle.length > 0) {
+  if (normalizedTitle.length > 0 && !isGenericToolTitle(normalizedTitle)) {
     return normalizedTitle;
   }
-  if (normalizedFallback.length > 0) {
-    return normalizedFallback;
+  if (normalizedTitle.length > 0 || normalizedFallback.length > 0) {
+    return "Tool";
   }
   return null;
 }
@@ -538,6 +538,8 @@ export function isGenericToolTitle(value: string): boolean {
     normalized === "tool call" ||
     normalized === "dynamic tool call" ||
     normalized === "mcp tool call" ||
+    normalized === "mcp tool" ||
+    normalized === "mcp" ||
     normalized === "agent task" ||
     normalized === "subagent task" ||
     normalized === "task" ||

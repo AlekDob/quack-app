@@ -17,12 +17,12 @@ tags: [composer-queue, dispatch-mode, thread-unmount, durable-queue, provider-co
 
 ### Files
 
-| Type      | Path                                                              | Exports/Purpose                                                                                                                                              |
-| --------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Component | `apps/web/src/components/ChatView.tsx`                            | Queue auto-dispatch effect (~9000), queue handoff-on-unmount effect (~9060), `dispatchQueuedComposerTurn` (~8860), per-thread `sendHandlersByThreadRef` map (~7049), handlers captured into it (~9992) |
-| Test      | `apps/web/src/components/ChatView.browser.tsx`                    | "hands queued follow-ups to the server queue when you switch threads" (~4585)                                                                                |
-| Reactor   | `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts`  | `drainQueuedTurnsForThread` (~2393), `drainQueuedTurnsForSession` (~2494) — promote the next queued turn once the live provider turn settles                  |
-| Repo      | `apps/server/src/persistence/Layers/QueuedTurnPromotions.ts`      | SQL-backed claim/promote lifecycle for `queued_turn_promotions` (`enqueue`, `claimNext`, `markPromoted`)                                                       |
+| Type      | Path                                                             | Exports/Purpose                                                                                                                                                                                        |
+| --------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Component | `apps/web/src/components/ChatView.tsx`                           | Queue auto-dispatch effect (~9000), queue handoff-on-unmount effect (~9060), `dispatchQueuedComposerTurn` (~8860), per-thread `sendHandlersByThreadRef` map (~7049), handlers captured into it (~9992) |
+| Test      | `apps/web/src/components/ChatView.browser.tsx`                   | "hands queued follow-ups to the server queue when you switch threads" (~4585)                                                                                                                          |
+| Reactor   | `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts` | `drainQueuedTurnsForThread` (~2393), `drainQueuedTurnsForSession` (~2494) — promote the next queued turn once the live provider turn settles                                                           |
+| Repo      | `apps/server/src/persistence/Layers/QueuedTurnPromotions.ts`     | SQL-backed claim/promote lifecycle for `queued_turn_promotions` (`enqueue`, `claimNext`, `markPromoted`)                                                                                               |
 
 ### Data Flow
 

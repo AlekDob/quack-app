@@ -54,7 +54,7 @@ export interface CursorAcpModelSelectionErrorContext {
 }
 
 export interface CursorAcpModelSelectionNotice {
-  readonly reason: "model-unavailable" | "model-rejected";
+  readonly reason: "model-unavailable" | "model-rejected" | "fast-forced";
   readonly message: string;
   readonly requestedModel: string;
   /** Model the session keeps running with, when one could be applied. */
@@ -1279,7 +1279,7 @@ function cursorModelChoiceSupportsRequestedParameters(choice: string, requested:
     if (choiceValue === requestedValue) {
       continue;
     }
-    if ((key === "fast" || key === "thinking") && requestedValue === "false") {
+    if (key === "thinking" && requestedValue === "false") {
       continue;
     }
     return false;
@@ -1293,6 +1293,34 @@ function findCursorModelChoiceWithSupportedParameters(
 ): string | undefined {
   return choices.find((choice) => cursorModelChoiceSupportsRequestedParameters(choice.slug, model))
     ?.slug;
+}
+
+function applyCursorRequestedFastMode(model: string, wantsFast: boolean): string {
+  if (!model.includes("[")) {
+    return model;
+  }
+  const params = cursorModelParametersToObject(model);
+  if (params.fast === undefined) {
+    return model;
+  }
+  params.fast = String(wantsFast);
+  return buildCursorParameterizedModelSlug(stripCursorParameterizedSuffix(model), params);
+}
+
+function findCursorModelChoiceForcingFast(
+  choices: ReadonlyArray<CursorAcpModelChoice>,
+  model: string,
+): string | undefined {
+  if (parseCursorModelParameters(model).get("fast") !== "false") {
+    return undefined;
+  }
+  const baseModel = stripCursorParameterizedSuffix(model);
+  return choices.find(
+    (choice) =>
+      stripCursorParameterizedSuffix(choice.slug) === baseModel &&
+      parseCursorModelParameters(choice.slug).get("fast") === "true" &&
+      cursorModelParametersEqualExceptFast(choice.slug, model),
+  )?.slug;
 }
 
 function resolveCursorAutoModelValue(
@@ -1323,6 +1351,7 @@ type CursorAcpModelSelectionOutcome =
   /** Nothing to apply: no model requested, or the agent picks it ("auto"). */
   | { readonly _tag: "None" }
   | { readonly _tag: "Resolved"; readonly value: string }
+  | { readonly _tag: "FastForced"; readonly value: string; readonly requested: string }
   | { readonly _tag: "Fallback"; readonly value: string; readonly requested: string }
   | { readonly _tag: "Unavailable"; readonly requested: string };
 
@@ -1364,14 +1393,21 @@ function resolveCursorAcpModelSelection(
       cliModel: trimmed,
       choices,
     }) ?? acpModelValue;
-  const resolvedModel =
+  const resolvedModel = applyCursorRequestedFastMode(
     buildCursorParameterizedModelFromOptions({
       acpModelValue: inferredModel,
       options,
       choices,
-    }) ?? inferredModel;
+    }) ?? inferredModel,
+    options?.fastMode === true,
+  );
   if (choices.some((choice) => choice.slug === resolvedModel)) {
     return { _tag: "Resolved", value: resolvedModel };
+  }
+
+  const forcedFast = findCursorModelChoiceForcingFast(choices, resolvedModel);
+  if (forcedFast) {
+    return { _tag: "FastForced", value: forcedFast, requested: trimmed };
   }
 
   const relaxedMatch =
@@ -1412,6 +1448,18 @@ function makeCursorUnavailableModelNotice(
       selection._tag === "Fallback"
         ? `Cursor does not offer ${requested} in this session; continuing with ${cursorModelLabel(selection.value)}.`
         : `Cursor does not offer ${requested} in this session; continuing with the agent's current model.`,
+  };
+}
+
+function makeCursorFastForcedNotice(
+  selection: Extract<CursorAcpModelSelectionOutcome, { _tag: "FastForced" }>,
+): CursorAcpModelSelectionNotice {
+  const requested = cursorModelLabel(selection.requested);
+  return {
+    reason: "fast-forced",
+    requestedModel: selection.requested,
+    appliedModel: selection.value,
+    message: `Cursor only offers Fast for ${requested} in this session; continuing with Fast.`,
   };
 }
 
@@ -1464,7 +1512,14 @@ export function applyCursorAcpModelSelection<E>(input: {
     if (selection._tag === "Fallback" || selection._tag === "Unavailable") {
       yield* notify(makeCursorUnavailableModelNotice(selection));
     }
-    if (selection._tag === "Resolved" || selection._tag === "Fallback") {
+    if (selection._tag === "FastForced") {
+      yield* notify(makeCursorFastForcedNotice(selection));
+    }
+    if (
+      selection._tag === "Resolved" ||
+      selection._tag === "Fallback" ||
+      selection._tag === "FastForced"
+    ) {
       const modelValue = selection.value;
       yield* input.runtime.setModel(modelValue).pipe(
         Effect.asVoid,

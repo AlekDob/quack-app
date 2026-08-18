@@ -325,6 +325,54 @@ describe("AcpRuntimeModel", () => {
     }
   });
 
+  it("uses Cursor MCP _toolName instead of MCP: tool", () => {
+    const named = parseSessionUpdateEvent({
+      sessionId: "session-1",
+      update: {
+        sessionUpdate: "tool_call",
+        toolCallId: "mcp-1",
+        title: "MCP: tool",
+        status: "pending",
+        rawInput: { _toolName: "synara_browser_snapshot" },
+      },
+    } satisfies Acp.SessionNotification);
+
+    expect(named.events[0]).toMatchObject({
+      _tag: "ToolCallUpdated",
+      toolCall: {
+        toolCallId: "mcp-1",
+        title: "synara_browser_snapshot",
+        data: {
+          toolName: "synara_browser_snapshot",
+        },
+      },
+    });
+  });
+
+  it("does not keep MCP: tool as the title when Cursor omits the method name", () => {
+    const unnamed = parseSessionUpdateEvent({
+      sessionId: "session-1",
+      update: {
+        sessionUpdate: "tool_call",
+        toolCallId: "mcp-2",
+        title: "MCP: tool",
+        status: "pending",
+        rawInput: {},
+      },
+    } satisfies Acp.SessionNotification);
+
+    expect(unnamed.events[0]).toMatchObject({
+      _tag: "ToolCallUpdated",
+      toolCall: {
+        toolCallId: "mcp-2",
+        title: "Tool",
+      },
+    });
+    if (unnamed.events[0]?._tag === "ToolCallUpdated") {
+      expect(unnamed.events[0].toolCall.title).not.toMatch(/mcp/i);
+    }
+  });
+
   it("trims padded current mode updates before emitting a mode change", () => {
     const result = parseSessionUpdateEvent({
       sessionId: "session-1",
