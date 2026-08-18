@@ -42,14 +42,14 @@ export function shouldLogTelemetryFlushFailure(consecutiveFailures: number): boo
   return consecutiveFailures === 1 || consecutiveFailures % FLUSH_FAILURE_LOG_EVERY === 0;
 }
 
+// Opt-in only: a public MIT checkout must never phone home to someone else's
+// PostHog project. Both the switch and the project key have to be supplied.
 const TelemetryEnvConfig = Config.all({
-  posthogKey: Config.string("SYNARA_POSTHOG_KEY").pipe(
-    Config.withDefault("phc_XAkRh21xG4XgQXT81heC39RYx5UnPHQHXYyyzIy4eC7"),
-  ),
+  posthogKey: Config.string("SYNARA_POSTHOG_KEY").pipe(Config.withDefault("")),
   posthogHost: Config.string("SYNARA_POSTHOG_HOST").pipe(
     Config.withDefault("https://eu.i.posthog.com"),
   ),
-  enabled: Config.boolean("SYNARA_TELEMETRY_ENABLED").pipe(Config.withDefault(true)),
+  enabled: Config.boolean("SYNARA_TELEMETRY_ENABLED").pipe(Config.withDefault(false)),
   flushBatchSize: Config.number("SYNARA_TELEMETRY_FLUSH_BATCH_SIZE").pipe(Config.withDefault(20)),
   maxBufferedEvents: Config.number("SYNARA_TELEMETRY_MAX_BUFFERED_EVENTS").pipe(
     Config.withDefault(1_000),
@@ -63,6 +63,10 @@ const makeAnalyticsService = Effect.gen(function* () {
   const identifier = yield* getTelemetryIdentifier;
   const bufferRef = yield* Ref.make<ReadonlyArray<BufferedAnalyticsEvent>>([]);
   const clientType = serverConfig.mode === "desktop" ? "desktop-app" : "cli-web-client";
+  // No key, no telemetry: forks that flip the switch without pointing it at
+  // their own PostHog project would otherwise POST batches with an empty
+  // api_key and fill the log with flush failures.
+  const telemetryEnabled = telemetryConfig.enabled && telemetryConfig.posthogKey.trim() !== "";
 
   const enqueueBufferedEvent = (event: string, properties?: Readonly<Record<string, unknown>>) =>
     Effect.flatMap(DateTime.now, (now) =>
@@ -93,7 +97,7 @@ const makeAnalyticsService = Effect.gen(function* () {
 
   const sendBatch = (events: ReadonlyArray<BufferedAnalyticsEvent>) =>
     Effect.gen(function* () {
-      if (!telemetryConfig.enabled || !identifier) return;
+      if (!telemetryEnabled || !identifier) return;
 
       const payload = {
         api_key: telemetryConfig.posthogKey,
@@ -150,7 +154,7 @@ const makeAnalyticsService = Effect.gen(function* () {
   );
 
   const record: AnalyticsServiceShape["record"] = Effect.fnUntraced(function* (event, properties) {
-    if (!telemetryConfig.enabled || !identifier) return;
+    if (!telemetryEnabled || !identifier) return;
 
     const enqueueResult = yield* enqueueBufferedEvent(event, properties);
     if (enqueueResult.dropped) {

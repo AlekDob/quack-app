@@ -37,6 +37,15 @@ Quack runs as the workspace layer on your machine. There is no Quack cloud holdi
 
 The provider you choose still receives the prompts, file snippets, diffs, terminal output, or tool results needed for a session, but that traffic goes to the provider you picked rather than through a separate Quack-hosted workspace.
 
+Telemetry is off. Nothing is sent anywhere unless you turn it on and point it at
+your own PostHog project:
+
+```sh
+SYNARA_TELEMETRY_ENABLED=true SYNARA_POSTHOG_KEY=phc_your_own_key quack
+```
+
+Without both variables the analytics layer stays silent.
+
 ## Linear
 
 Open Linear issues as unsent Quack drafts: [setup guide](./docs/linear-coding-tools.md).
