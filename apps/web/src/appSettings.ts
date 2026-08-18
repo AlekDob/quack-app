@@ -89,6 +89,9 @@ export const DEFAULT_SIDEBAR_THREAD_SORT_ORDER: SidebarThreadSortOrder = "update
 export const FollowUpBehavior = Schema.Literals(["queue", "steer"]);
 export type FollowUpBehavior = typeof FollowUpBehavior.Type;
 export const DEFAULT_FOLLOW_UP_BEHAVIOR: FollowUpBehavior = "queue";
+export const LinearRenameChat = Schema.Literals(["ask", "always", "never"]);
+export type LinearRenameChat = typeof LinearRenameChat.Type;
+export const DEFAULT_LINEAR_RENAME_CHAT: LinearRenameChat = "ask";
 
 export const UiDensity = Schema.Literals(UI_DENSITY_MODES);
 export type UiDensity = typeof UiDensity.Type;
@@ -227,6 +230,7 @@ export const AppSettingsSchema = Schema.Struct({
   showEnvironmentUsage: Schema.Boolean.pipe(withDefaults(() => true)),
   showEnvironmentRepository: Schema.Boolean.pipe(withDefaults(() => true)),
   showEnvironmentPullRequest: Schema.Boolean.pipe(withDefaults(() => true)),
+  showEnvironmentLinear: Schema.Boolean.pipe(withDefaults(() => true)),
   showEnvironmentEditor: Schema.Boolean.pipe(withDefaults(() => true)),
   showEnvironmentRecap: Schema.Boolean.pipe(withDefaults(() => true)),
   showEnvironmentPinned: Schema.Boolean.pipe(withDefaults(() => true)),
@@ -234,6 +238,7 @@ export const AppSettingsSchema = Schema.Struct({
   showEnvironmentInstructions: Schema.Boolean.pipe(withDefaults(() => false)),
   showEnvironmentNotepad: Schema.Boolean.pipe(withDefaults(() => false)),
   followUpBehavior: FollowUpBehavior.pipe(withDefaults(() => DEFAULT_FOLLOW_UP_BEHAVIOR)),
+  linearRenameChat: LinearRenameChat.pipe(withDefaults(() => DEFAULT_LINEAR_RENAME_CHAT)),
   enableAssistantStreaming: Schema.Boolean.pipe(withDefaults(() => true)),
   // Typewriter reveal for streamed assistant text. Off by default: it drives a setState per
   // animation frame (~60/s) on the streaming message, which repaints the whole timeline.

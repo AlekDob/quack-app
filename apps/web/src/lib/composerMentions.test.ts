@@ -10,6 +10,7 @@ import {
   filterPromptProviderMentionReferences,
   filterPromptSkillReferences,
   formatComposerMentionToken,
+  isLinearProviderMentionReference,
   isThreadProviderMentionReference,
   resolveMentionChipKind,
 } from "./composerMentions";
@@ -67,6 +68,24 @@ describe("composer mention reference filtering", () => {
     expect(resolveMentionChipKind("linear")).toBe("path");
     expect(resolveMentionChipKind("linear", { kind: "plugin" })).toBe("plugin");
     expect(resolveMentionChipKind("linear", { mentionReferences: [plugin] })).toBe("plugin");
+  });
+
+  it("serializes and reconciles a quoted Linear issue token with its linear:// path", () => {
+    const mention = { name: "ALE-22 Kanban", path: "linear://ALE-22" };
+    const token = formatComposerMentionToken(mention.name);
+
+    expect(token).toBe('@"ALE-22 Kanban"');
+    expect(isLinearProviderMentionReference(mention)).toBe(true);
+    expect(filterPromptProviderMentionReferences(`See ${token} please`, [mention])).toEqual([
+      mention,
+    ]);
+    expect(filterPromptProviderMentionReferences("See @ALE-22 please", [mention])).toEqual([
+      mention,
+    ]);
+    expect(filterPromptProviderMentionReferences("See the board please", [mention])).toEqual([]);
+    expect(resolveMentionChipKind("linear")).toBe("path");
+    expect(resolveMentionChipKind(mention.path)).toBe("linear");
+    expect(resolveMentionChipKind(mention.name, { mentionReferences: [mention] })).toBe("linear");
   });
 
   it("serializes and reconciles a quoted thread token with its authoritative thread id", () => {

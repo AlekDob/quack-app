@@ -260,6 +260,10 @@ describe("environment panel defaults", () => {
       showEnvironmentNotepad: true,
     });
   });
+
+  it("defaults Linear chat rename to ask", () => {
+    expect(AppSettingsSchema.makeUnsafe({}).linearRenameChat).toBe("ask");
+  });
 });
 
 describe("resolveAppModelSelection", () => {

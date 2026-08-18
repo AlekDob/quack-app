@@ -19,6 +19,7 @@ export const SETTINGS_SECTION_IDS = [
   "skills",
   "usage",
   "integrations",
+  "linear",
   "advanced",
 ] as const;
 
@@ -128,6 +129,14 @@ export const SETTINGS_NAV_ITEMS: readonly SettingsNavItem[] = [
     description: "Give Codex, Claude, and other local agents scoped access to Quack tasks.",
     icon: "plugin-1",
     eyebrow: "External agents",
+  },
+  {
+    id: "linear",
+    group: "integrations",
+    label: "Linear",
+    description: "Connect Linear so @ in a chat can pick an open issue or create a new one.",
+    icon: "linear",
+    eyebrow: "Issue tracker",
   },
   {
     id: "providers",

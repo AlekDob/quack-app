@@ -34,6 +34,10 @@ import { automationRequiresTargetThread } from "@synara/shared/automationMode";
 import { providerSupportsNativeTurnSteering } from "@synara/shared/providerMetadata";
 import { getModelCapabilities, normalizeModelSlug } from "@synara/shared/model";
 import {
+  linearMentionNameFromIssue,
+  linearMentionPathForIdentifier,
+} from "@synara/shared/linearMentions";
+import {
   resolveLatestTailUserMessageEditTarget,
   resolveTailUserMessageEditTarget,
 } from "@synara/shared/conversationEdit";
@@ -305,6 +309,7 @@ import { selectRightDockState, useRightDockStore } from "../rightDockStore";
 import { useStore } from "../store";
 import { LinearCreateIssueDialog } from "./chat/LinearCreateIssueDialog";
 import { RenameThreadDialog } from "./RenameThreadDialog";
+import { rememberLinearIssueUrl } from "~/lib/linearIssueUrls";
 import { getThreadFromState } from "../threadDerivation";
 import { useWorkspacePathsStore } from "../workspacePathsStore";
 import {
@@ -325,6 +330,7 @@ import { useTheme } from "../hooks/useTheme";
 import { useThreadWorkspaceHandoff } from "../hooks/useThreadWorkspaceHandoff";
 import {
   buildSearchableModelOptions,
+  linearComposerCreateQuery,
   useComposerCommandMenuItems,
 } from "../hooks/useComposerCommandMenuItems";
 import { useProviderModelCatalog } from "../hooks/useProviderModelCatalog";
@@ -357,6 +363,15 @@ import { ComposerQueuedHeader } from "./chat/ComposerQueuedHeader";
 import { ComposerLiveChangesHeader } from "./chat/ComposerLiveChangesHeader";
 import { ComposerPickerMenuPopup } from "./chat/ComposerPickerMenuPopup";
 import { Button } from "./ui/button";
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 import { Skeleton } from "./ui/skeleton";
 import { Menu, MenuItem, MenuTrigger } from "./ui/menu";
 import { randomTerminalId } from "./terminal/terminalIds";
@@ -3282,7 +3297,7 @@ export default function ChatView({
   const isLinearConnected = serverSettingsQuery.data?.linear.apiKeyConfigured ?? false;
   const linearIssuesQuery = useQuery(
     linearIssuesQueryOptions({
-      query: effectiveMentionQuery,
+      query: linearComposerCreateQuery(effectiveMentionQuery) ?? effectiveMentionQuery,
       enabled: isLinearConnected && isMentionTrigger,
     }),
   );
@@ -9994,8 +10009,7 @@ export default function ChatView({
 
   // Holds the prefilled title while the "New Linear issue" dialog is open.
   const [linearCreateDraftTitle, setLinearCreateDraftTitle] = useState<string | null>(null);
-  // Picking a Linear issue only retitles the chat: `ALE-28 Integrazione linear`.
-  // Nothing is inserted into the prompt and nothing is written back to Linear.
+  const [pendingLinearRename, setPendingLinearRename] = useState<LinearIssue | null>(null);
   const renameThreadToLinearIssue = useCallback(
     (issue: LinearIssue) => {
       if (!activeThread) return;
@@ -10028,6 +10042,33 @@ export default function ChatView({
       });
     },
     [activeThread, isLocalDraftThread],
+  );
+  const addLinearIssueMention = useCallback(
+    (issue: LinearIssue) => {
+      rememberLinearIssueUrl(issue.identifier, issue.url);
+      const mention = {
+        name: linearMentionNameFromIssue(issue),
+        path: linearMentionPathForIdentifier(issue.identifier),
+      } satisfies ProviderMentionReference;
+      updateSelectedComposerMentions((existing) => {
+        const nextWithoutSamePath = existing.filter((item) => item.path !== mention.path);
+        return [...nextWithoutSamePath, mention];
+      });
+      return mention;
+    },
+    [updateSelectedComposerMentions],
+  );
+  const maybeRenameThreadForLinearIssue = useCallback(
+    (issue: LinearIssue) => {
+      if (settings.linearRenameChat === "always") {
+        renameThreadToLinearIssue(issue);
+        return;
+      }
+      if (settings.linearRenameChat === "ask") {
+        setPendingLinearRename(issue);
+      }
+    },
+    [renameThreadToLinearIssue, settings.linearRenameChat],
   );
   const onSelectComposerItem = useCallback(
     (item: ComposerCommandItem) => {
@@ -10124,8 +10165,23 @@ export default function ChatView({
         return;
       }
       if (item.type === "linear-issue") {
-        applyComposerTriggerReplacement({ snapshot, trigger, base: "" });
-        renameThreadToLinearIssue(item.issue);
+        rememberLinearIssueUrl(item.issue.identifier, item.issue.url);
+        const mention = {
+          name: linearMentionNameFromIssue(item.issue),
+          path: linearMentionPathForIdentifier(item.issue.identifier),
+        } satisfies ProviderMentionReference;
+        applyComposerTriggerReplacement({
+          snapshot,
+          trigger,
+          base: `${formatComposerMentionToken(mention.name)} `,
+          onApplied: () => {
+            updateSelectedComposerMentions((existing) => {
+              const nextWithoutSamePath = existing.filter((entry) => entry.path !== mention.path);
+              return [...nextWithoutSamePath, mention];
+            });
+          },
+        });
+        maybeRenameThreadForLinearIssue(item.issue);
         return;
       }
       if (item.type === "linear-create") {
@@ -10157,7 +10213,7 @@ export default function ChatView({
       updateSelectedComposerMentions,
       updateSelectedComposerSkills,
       resolveActiveComposerTrigger,
-      renameThreadToLinearIssue,
+      maybeRenameThreadForLinearIssue,
     ],
   );
   const onComposerMenuItemHighlighted = useCallback((itemId: string | null) => {
@@ -10959,6 +11015,19 @@ export default function ChatView({
     activeThread.id,
   ).map((definition) => ({ definition }));
 
+  const linearEnvironmentMentions = useMemo(() => {
+    const mentions: ProviderMentionReference[] = [...selectedComposerMentions];
+    for (const message of activeThread.messages) {
+      if (message.role !== "user" || !message.mentions) continue;
+      mentions.push(...message.mentions);
+    }
+    for (const message of optimisticUserMessages) {
+      if (!message.mentions) continue;
+      mentions.push(...message.mentions);
+    }
+    return mentions;
+  }, [activeThread.messages, optimisticUserMessages, selectedComposerMentions]);
+
   // Shared inputs for both Environment panel surfaces (the header Popover when the dock is
   // open, and the docked right column when it is closed) so the two never drift.
   const environmentPanelProps: Omit<EnvironmentPanelProps, "open" | "variant"> = {
@@ -10993,6 +11062,7 @@ export default function ChatView({
     onToggleDiff,
     onOpenAutomation: openAutomationEditDialog,
     onOpenGithubRepository: openBrowserUrl,
+    linearMentions: linearEnvironmentMentions,
     onJumpToPinnedMessage: handleJumpToPinnedMessage,
     onTogglePinnedMessageDone: handleTogglePinnedMessageDone,
     onUnpinMessage: handleUnpinMessage,
@@ -11723,8 +11793,47 @@ export default function ChatView({
       <LinearCreateIssueDialog
         draftTitle={linearCreateDraftTitle}
         onClose={() => setLinearCreateDraftTitle(null)}
-        onCreated={renameThreadToLinearIssue}
+        onCreated={(issue) => {
+          appendComposerPromptText(threadId, formatComposerMentionToken(linearMentionNameFromIssue(issue)));
+          addLinearIssueMention(issue);
+          maybeRenameThreadForLinearIssue(issue);
+        }}
       />
+      <AlertDialog
+        open={pendingLinearRename !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingLinearRename(null);
+        }}
+      >
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingLinearRename
+                ? `Rename this chat to ${linearMentionNameFromIssue(pendingLinearRename)}?`
+                : "Rename this chat?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The Linear issue stays in the composer either way.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose render={<Button variant="outline" size="sm" />}>
+              Keep title
+            </AlertDialogClose>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (pendingLinearRename) {
+                  renameThreadToLinearIssue(pendingLinearRename);
+                }
+                setPendingLinearRename(null);
+              }}
+            >
+              Rename
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
       {automationDraftForm ? (
         <AutomationDialog
           open={automationDraftOpen}

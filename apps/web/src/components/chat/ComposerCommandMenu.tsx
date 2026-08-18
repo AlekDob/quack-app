@@ -28,7 +28,6 @@ import {
   MessageCircleIcon,
   Minimize2,
   PluginIcon,
-  PlusIcon,
   SkillCubeIcon,
   TemporaryThreadIcon,
   TerminalIcon,
@@ -46,6 +45,7 @@ import {
 } from "../ui/command";
 import { FileEntryIcon } from "./FileEntryIcon";
 import { ProviderIcon } from "../ProviderIcon";
+import { CentralIcon } from "~/lib/central-icons";
 import {
   COMPOSER_COMMAND_MENU_ITEM_ACTIVE_CLASS_NAME,
   COMPOSER_COMMAND_MENU_ITEM_CLASS_NAME,
@@ -311,6 +311,13 @@ export function groupCommandItems(
     if (otherItems.length > 0) {
       groups.push({ id: "other", label: null, items: otherItems });
     }
+    if (items[0]?.type === "linear-create") {
+      const linearIndex = groups.findIndex((group) => group.id === "linear");
+      if (linearIndex > 0) {
+        const [linearGroup] = groups.splice(linearIndex, 1);
+        if (linearGroup) groups.unshift(linearGroup);
+      }
+    }
     return groups;
   }
 
@@ -544,9 +551,8 @@ function commandMenuItemGlyph(item: ComposerCommandItem, theme: "light" | "dark"
     case "skill":
       return <SkillCubeIcon className={cls} />;
     case "linear-issue":
-      return <ListTodoIcon className={cls} />;
     case "linear-create":
-      return <PlusIcon className={cls} />;
+      return <CentralIcon name="linear" className={cls} />;
     default:
       return null;
   }

@@ -34,7 +34,7 @@ export function LinearCreateIssueDialog(props: {
       <DialogPopup className="max-w-md">
         <DialogHeader>
           <DialogTitle>New Linear issue</DialogTitle>
-          <DialogDescription>The chat is renamed to the new ticket.</DialogDescription>
+          <DialogDescription>Creates a Linear issue and inserts it in this chat.</DialogDescription>
         </DialogHeader>
         {/* Form state lives below DialogPopup, which unmounts on close, so each
             open starts from a fresh draft without a reset effect. */}

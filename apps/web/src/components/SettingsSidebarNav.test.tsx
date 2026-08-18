@@ -55,6 +55,14 @@ describe("rankSettingsSearchEntries", () => {
     expect(rankSettingsSearchEntries("e", 3)).toHaveLength(3);
   });
 
+  it("deep-links Linear settings rows from their titles", () => {
+    for (const id of ["linear:issues", "linear:api-key", "linear:rename-chat"]) {
+      const entry = SETTINGS_SEARCH_ENTRIES.find((item) => item.id === id);
+      expect(entry).toBeDefined();
+      expect(settingsSearchEntryTarget(entry!)).toBe(settingRowAnchorId(entry!.title));
+    }
+  });
+
   it("derives a deep-link anchor target from each entry's title", () => {
     const themeEntry = SETTINGS_SEARCH_ENTRIES.find((entry) => entry.id === "appearance:theme")!;
     expect(settingsSearchEntryTarget(themeEntry)).toBe("setting-theme");
@@ -92,6 +100,7 @@ describe("SettingsSidebarNav", () => {
     expect(markup).toContain("Archived");
     expect(markup).toContain("Chat behavior");
     expect(markup).toContain("MCP connections");
+    expect(markup).toContain("Linear");
     expect(markup).toContain("Agent providers");
     expect(markup).toContain("Managed worktrees");
     expect(markup).toContain("System tools");

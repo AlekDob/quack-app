@@ -145,7 +145,8 @@ function renderMentionChipDom(
 
   const label = document.createElement("span");
   label.className = COMPOSER_INLINE_CHIP_LABEL_CLASS_NAME;
-  label.textContent = kind === "thread" ? pathValue : basenameOfPath(pathValue);
+  label.textContent =
+    kind === "thread" || kind === "linear" ? pathValue : basenameOfPath(pathValue);
 
   container.append(icon, label);
 }

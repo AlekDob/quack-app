@@ -4,88 +4,118 @@ project: quack-20
 stack: Effect / Node.js / React (Vite) / TypeScript
 created: 2026-08-14
 startDate: 2026-08-14
-endDate: 2026-08-14
-last_verified: 2026-08-14
+endDate:
+last_verified: 2026-08-18
 status: active
-tags: [linear, composer, mention, settings, secrets, websocket]
+tags: [linear, composer, mention, settings, secrets, websocket, environment]
 ---
 
 ## Integrazione Linear nel composer (ALE-28)
 
-**Scopo:** prima, lavorare su un ticket Linear voleva dire uscire da Quack, copiare
-codice e titolo a mano, e rinominare la sessione da soli. Ora scrivendo `@` nel
-composer compaiono i propri ticket Linear aperti; sceglierne uno rinomina la
-sessione come `ALE-28 Titolo`. Se il ticket non esiste ancora, si crea da lì
-(titolo + team + progetto).
+**Scopo:** `@` nel composer elenca i ticket Linear aperti. Sceglierne uno inserisce un chip `@"ALE-22 Kanban"` (path `linear://ALE-22`) e, in base alle Settings, può rinominare la chat. `@+` mette **New Linear issue** in cima. I ticket citati compaiono anche nel pannello Environment.
 
-Deciso con l'utente, per scelta e non per dimenticanza:
+**Stack:** React / TypeScript (`apps/web`) + Node (`apps/server`) + shared (`packages/shared`)
 
-- Auth: API key personale in Settings, non OAuth.
-- Selezionare un ticket = **solo** rinomina sessione. Niente branch/worktree da
-  `gitBranchName`, niente prompt precompilato, niente scrittura di stato o
-  assegnatario su Linear.
-- Creazione ticket: form minimo, titolo + team + progetto opzionale.
-- Elenco: solo ticket non `completed`/`canceled` (backlog, triage, unstarted, started).
+Deciso con l'utente:
 
-Vedi anche [018-linear-project-routing.md](018-linear-project-routing.md): quella
-feature instrada il deep-link `quack://open?source=linear` verso il progetto Quack
-giusto. Questa è indipendente — nessuna delle due tocca il codice dell'altra.
+- Auth: API key personale in Settings → Linear, non OAuth.
+- Il ticket vive nelle `mentions` del composer/messaggio, come file e chat. Nessuna colonna SQLite nuova.
+- Rinomina chat: `linearRenameChat` = `ask` (default) / `always` / `never`.
+- Nessuna scrittura di stato, assegnatario o branch su Linear.
 
-### File
+Vedi [018-linear-project-routing.md](018-linear-project-routing.md) per il deep-link `quack://open?source=linear`. Indipendente da questa feature.
 
-| Area      | File                                                       | Scopo                                                                                |
-| --------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Contratti | `packages/contracts/src/linear.ts`                         | `LinearIssue`, `LinearTeam`, `LinearProject`, `LinearCreateOptions`, input schemas   |
-| Contratti | `packages/contracts/src/settings.ts`                       | `LinearServerSettings.apiKeyConfigured` in `ServerSettings`/patch                    |
-| Contratti | `packages/contracts/src/ws.ts`, `rpc.ts`, `ipc.ts`         | 3 metodi WS: `linear.searchIssues`, `linear.listCreateOptions`, `linear.createIssue` |
-| Server    | `apps/server/src/linear/linearCredentials.ts`              | Legge/scrive la API key nel secret store (mai in `settings.json`)                    |
-| Server    | `apps/server/src/linear/linearClient.ts`                   | Client GraphQL minimale su `fetchJson`, origin pinnata `api.linear.app`              |
-| Server    | `apps/server/src/linear/linearClient.test.ts`              | Copre il filtro stato e la mappatura errori 401                                      |
-| Server    | `apps/server/src/serverSettings.ts`                        | Split segreto/patch, `withCredentialState` calcola `apiKeyConfigured`                |
-| Server    | `apps/server/src/wsRpc.ts`                                 | Handler dei 3 metodi, `withLinearApiKey` per il messaggio "connetti Linear"          |
-| Server    | `apps/server/src/wsRequestAdmission.ts`                    | `searchIssues`/`listCreateOptions` in `EXPENSIVE_READ_METHODS`                       |
-| Web       | `apps/web/src/components/settings/LinearSettingsPanel.tsx` | Campo API key in Settings → Integrations                                             |
-| Web       | `apps/web/src/lib/linearReactQuery.ts`                     | Query options per issues/createOptions + `createLinearIssue`                         |
-| Web       | `apps/web/src/hooks/useComposerCommandMenuItems.ts`        | Costruisce le voci `linear-issue`/`linear-create` del menu `@`                       |
-| Web       | `apps/web/src/components/chat/ComposerCommandMenu.tsx`     | Icone, gruppo "Linear", testo secondario (stato/progetto)                            |
-| Web       | `apps/web/src/components/chat/LinearCreateIssueDialog.tsx` | Dialog titolo + select team + select progetto                                        |
-| Web       | `apps/web/src/components/ChatView.tsx`                     | Query Linear, `renameThreadToLinearIssue`, selezione nel menu `@`                    |
+Diario: [2026-08-18](../diary/2026-08-18.md) (chip + Environment + `@+`); [2026-08-14](../diary/2026-08-14.md) (prima integrazione, solo rinomina).
 
-### Flusso dati
+### Files
 
-`@ale` nel composer → `linearIssuesQueryOptions` (debounced sulla query mention) →
-`linear.searchIssues` via WS → `apps/server/src/linear/linearClient.ts` →
-`issues`/`searchIssues` GraphQL con `filter: { state: { type: { nin: ["completed","canceled"] } } }`
-→ lista mappata in `ComposerCommandItem` di tipo `linear-issue`.
+| Type | Path | Exports/Purpose |
+|------|------|-----------------|
+| Util | `packages/shared/src/linearMentions.ts` | `linear://ALE-22` path helpers + public issue URL |
+| Test | `packages/shared/src/linearMentions.test.ts` | Round-trip identifier / reject `plugin://linear` |
+| Config | `packages/shared/package.json` | Export `@synara/shared/linearMentions` |
+| Model/Type | `packages/contracts/src/linear.ts` | `LinearIssue` (`identifier`, `title`, `url`, …) |
+| Model/Type | `packages/contracts/src/settings.ts` | `linear.apiKeyConfigured` |
+| Contratti | `packages/contracts/src/ws.ts`, `rpc.ts`, `ipc.ts` | `linear.searchIssues`, `linear.listCreateOptions`, `linear.createIssue` |
+| Service | `apps/server/src/linear/linearCredentials.ts` | API key nel secret store, mai in `settings.json` |
+| Service | `apps/server/src/linear/linearClient.ts` | GraphQL `fetchJson`, origin `api.linear.app` |
+| Test | `apps/server/src/linear/linearClient.test.ts` | Filtro stato + errori 401 |
+| Service | `apps/server/src/serverSettings.ts` | `apiKeyConfigured` |
+| Service | `apps/server/src/wsRpc.ts` | Handler WS + `withLinearApiKey` |
+| Config | `apps/web/src/appSettings.ts` | `linearRenameChat`, `showEnvironmentLinear` |
+| Util | `apps/web/src/lib/composerMentions.ts` | Chip kind `"linear"`; token keys include identifier |
+| Util | `apps/web/src/lib/linearIssueUrls.ts` | Cache URL dal picker; fallback `https://linear.app/issue/<id>` |
+| Hook | `apps/web/src/hooks/useComposerCommandMenuItems.ts` | Voci menu; `linearComposerCreateQuery` per `@+` |
+| Component | `apps/web/src/components/chat/ComposerCommandMenu.tsx` | Icona Central `linear`; gruppo Linear in cima se create è primo |
+| Component | `apps/web/src/components/chat/MentionChipIcon.tsx` | Icona Linear su chip composer/messaggio |
+| Component | `apps/web/src/components/chat/InlineMentionChip.tsx` | Label = nome; click apre Linear |
+| Component | `apps/web/src/components/composer-nodes/index.tsx` | Label chip Lexical per kind `linear` |
+| Component | `apps/web/src/components/chat/LinearCreateIssueDialog.tsx` | Crea ticket e lo inserisce nel composer |
+| Component | `apps/web/src/components/ChatView.tsx` | Insert mention, Ask/Always/Never, Environment mentions |
+| Component | `apps/web/src/components/settings/LinearSettingsPanel.tsx` | API key + rinomina Ask/Always/Never |
+| Component | `apps/web/src/components/chat/environment/EnvironmentLinearSection.tsx` | Righe uniche `linear://` da draft + messaggi user |
+| Component | `apps/web/src/components/chat/environment/EnvironmentPanel.tsx` | Sezione Linear dopo PR |
+| Route/Page | `apps/web/src/routes/_chat.settings.tsx` | Toggle Environment → Linear |
+| Config | `apps/web/src/settingsNavigation.ts` | Sezione Settings `linear` |
+| Config | `apps/web/src/settingsSearchIndex.ts` | Search: Issues, API key, rename, Environment Linear |
+| Util | `apps/web/src/composer-editor-mentions.ts` | Segment kind `linear` da mention refs |
+| Test | `apps/web/src/lib/composerMentions.test.ts` | `resolveMentionChipKind("linear")` resta `"path"` senza ref `linear://` |
+| Test | `apps/web/src/composer-editor-mentions.test.ts` | `@linear` plugin vs `@"ALE-22 Kanban"` linear |
+| Test | `apps/web/src/components/chat/environment/EnvironmentLinearSection.test.ts` | Dedup per identifier |
+| Test | `apps/web/src/components/chat/ComposerCommandMenu.test.ts` | `@+` alza il gruppo Linear |
+| Test | `apps/web/src/hooks/useComposerCommandMenuItems.test.ts` | `linearComposerCreateQuery` |
 
-Selezione ticket → `dispatchThreadRename({ newTitle: "${identifier} ${title}" })` —
-stesso percorso usato da rinomina manuale e kanban, **nessun** testo inserito nel
-composer.
+### Data Flow
 
-"New Linear issue" → `LinearCreateIssueDialog` → `linear.createIssue` →
-`createLinearIssue` (client) → stesso `renameThreadToLinearIssue` sul ticket appena
-creato.
+`@` / `@ale` → `linearIssuesQueryOptions` → `linear.searchIssues` → GraphQL (stati non completed/canceled) → voci `linear-issue`.
+
+Pick issue → token `formatComposerMentionToken(name)` + mention `{ name, path: linear://ALE-22 }` → chip. Poi `linearRenameChat`: `always` rinomina; `never` no; `ask` → AlertDialog Rename / Keep title.
+
+`@+` / `@+Kanban` → `linearComposerCreateQuery` → create come prima voce; search Linear usa il testo dopo `+`.
+
+"New Linear issue" → dialog → `linear.createIssue` → stesso insert chip + policy rinomina.
+
+Chip click → `issue.url` se ancora in cache di sessione, altrimenti `https://linear.app/issue/ALE-22`.
+
+Environment: draft `selectedComposerMentions` + `message.mentions` user (incluso optimistic) → `collectLinearEnvironmentItems` → righe; click usa il browser in-app.
+
+### Key Functions
+
+- `linearMentionPathForIdentifier(id: string) → string` — `linear://ALE-22`
+- `identifierFromLinearMentionPath(path: string) → string | null` — null su `plugin://linear…`
+- `linearComposerCreateQuery(query: string) → string | null` — `@+` shortcut; resto = titolo
+- `resolveMentionChipKind(path, options) → MentionChipKind` — `"linear"` solo con path `linear://` o ref; `"linear"` nudo resta file/plugin
+- `collectLinearEnvironmentItems(mentions) → LinearEnvironmentItem[]` — unique per identifier
+- `rememberLinearIssueUrl(id, url) → void` — cache in memoria, persa al reload
+
+### State
+
+- `linearRenameChat`: `"ask" | "always" | "never"` — default `ask` (local AppSettings)
+- `showEnvironmentLinear`: boolean — default `true` (local AppSettings)
+- `pendingLinearRename`: `LinearIssue | null` — dialog Ask (component ChatView)
+- `rememberedLinearIssueUrls`: `Map<id, url>` — sessione browser (module)
+
+### External Dependencies
+
+- Linear GraphQL: `https://api.linear.app` via server `linearClient` (search/create only)
+
+### Config
+
+- `linear.apiKeyConfigured`: flag pubblico; la key sta nel secret store
+- `linearRenameChat`: Ask / Always / Never (default Ask)
+- `showEnvironmentLinear`: toggle Environment (default true)
 
 ### Auth e sicurezza
 
-La API key vive solo nel secret store del server (`~/.synara/userdata/secrets/`,
-0600), esattamente come le altre credenziali provider. `settings.json` porta solo
-`linear.apiKeyConfigured: boolean`. Le chiamate HTTP passano da `fetchJson`
-(`apps/server/src/providerUsage/http.ts`) con allowlist esatta su
-`https://api.linear.app`, niente redirect.
+API key solo nel secret store (`~/.synara/userdata/secrets/`, 0600). `settings.json` ha solo `apiKeyConfigured`. HTTP via `fetchJson` allowlist `https://api.linear.app`.
 
-**Gotcha:** `readLinearApiKey`/`writeLinearApiKey`/`isLinearApiKeyConfigured`
-prendono `ServerSecretStoreShape` come **parametro**, non come dipendenza Effect
-(`R`). Se tornassero `Effect` con requirement `ServerSecretStore`, quel requirement
-risalirebbe fino a `ServerSettingsShape.start`/`updateSettings` e rompe il
-typecheck (`Effect<..., ServerSecretStore>` non assegnabile a `Effect<..., never>`).
+**Gotcha:** `readLinearApiKey` / `writeLinearApiKey` prendono `ServerSecretStoreShape` come parametro, non come requirement Effect — altrimenti rompe `ServerSettingsShape`.
 
-### Cosa NON fa (per scelta, non per dimenticanza)
+**Gotcha:** `plugin://linear@…` e `linear://ALE-22` sono path diversi. `@linear` senza ref resta kind `"path"` / plugin.
 
-- Nessuna colonna nuova su `projection_threads`: il legame col ticket vive solo nel
-  titolo della sessione.
-- Nessuna scrittura di stato/assegnatario su Linear, nessun branch da `gitBranchName`,
-  nessuna descrizione del ticket iniettata nel prompt.
-- Il title probe automatico non è stato toccato: rinomina solo titoli ancora
-  generici, quindi la rinomina manuale da ticket lo disattiva di per sé — verificato
-  a mano, non da un guard esplicito nel codice.
+### Cosa NON fa (per scelta)
+
+- Nessuna colonna su `projection_threads`.
+- Nessuna scrittura stato/assegnatario/branch su Linear.
+- Nessun gruppo sidebar di thread Linear.
+- La cache URL del picker non sopravvive al reload: dopo, il chip usa `https://linear.app/issue/<id>`.

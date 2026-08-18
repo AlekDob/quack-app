@@ -28,6 +28,9 @@ function composerMentionChipCentralIconName(path: string, kind: MentionChipKind 
   if (kind === "plugin" || path.startsWith("plugin://")) {
     return "puzzle";
   }
+  if (kind === "linear" || path.startsWith("linear://")) {
+    return "linear";
+  }
   if (inferEntryKindFromPath(path) === "directory") {
     return "folder-2";
   }
@@ -73,6 +76,9 @@ export const MentionChipIcon = function MentionChipIcon(props: {
   }
   if (resolvedKind === "plugin") {
     return <PluginIcon className={className} />;
+  }
+  if (resolvedKind === "linear") {
+    return <CentralIcon name="linear" className={className} />;
   }
   const kind = inferEntryKindFromPath(props.path);
   if (kind === "directory") {

@@ -244,6 +244,10 @@
       "types": "./src/threadMentions.ts",
       "import": "./src/threadMentions.ts"
     },
+    "./linearMentions": {
+      "types": "./src/linearMentions.ts",
+      "import": "./src/linearMentions.ts"
+    },
     "./browserAutomationCatalogue": {
       "types": "./src/browserAutomationCatalogue.ts",
       "import": "./src/browserAutomationCatalogue.ts"

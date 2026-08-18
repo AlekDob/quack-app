@@ -4,6 +4,10 @@
 // Exports: mention token formatters plus regex helpers used by composer parsing and prompt sync.
 
 import type { ProviderMentionReference, ProviderSkillReference } from "@synara/contracts";
+import {
+  identifierFromLinearMentionPath,
+  isLinearMentionPath,
+} from "@synara/shared/linearMentions";
 import { isThreadMentionPath, threadIdFromThreadMentionPath } from "@synara/shared/threadMentions";
 
 export function skillMentionPrefix(provider: string): string {
@@ -134,6 +138,11 @@ function collectProviderMentionTokenKeys(mention: ProviderMentionReference): Set
     }
   }
 
+  const linearIdentifier = identifierFromLinearMentionPath(mention.path);
+  if (linearIdentifier) {
+    keys.add(normalizeMentionNameKey(linearIdentifier));
+  }
+
   return keys;
 }
 
@@ -147,7 +156,7 @@ export function providerMentionMatchesToken(
   );
 }
 
-export type MentionChipKind = "path" | "plugin" | "thread";
+export type MentionChipKind = "path" | "plugin" | "thread" | "linear";
 
 export function isPluginProviderMentionReference(mention: ProviderMentionReference): boolean {
   return mention.path.startsWith("plugin://");
@@ -155,6 +164,10 @@ export function isPluginProviderMentionReference(mention: ProviderMentionReferen
 
 export function isThreadProviderMentionReference(mention: ProviderMentionReference): boolean {
   return isThreadMentionPath(mention.path);
+}
+
+export function isLinearProviderMentionReference(mention: ProviderMentionReference): boolean {
+  return isLinearMentionPath(mention.path);
 }
 
 export function threadIdFromProviderMentionReference(
@@ -173,6 +186,16 @@ export function findThreadProviderMentionReferenceForToken(
   );
 }
 
+export function findLinearProviderMentionReferenceForToken(
+  token: string,
+  mentions: ReadonlyArray<ProviderMentionReference> | undefined,
+): ProviderMentionReference | undefined {
+  return mentions?.find(
+    (mention) =>
+      isLinearProviderMentionReference(mention) && providerMentionMatchesToken(mention, token),
+  );
+}
+
 export function resolveMentionChipKind(
   path: string,
   options?: {
@@ -186,6 +209,9 @@ export function resolveMentionChipKind(
   if (options?.kind === "plugin" || path.startsWith("plugin://")) {
     return "plugin";
   }
+  if (options?.kind === "linear" || isLinearMentionPath(path)) {
+    return "linear";
+  }
   if (findThreadProviderMentionReferenceForToken(path, options?.mentionReferences)) {
     return "thread";
   }
@@ -196,6 +222,9 @@ export function resolveMentionChipKind(
     )
   ) {
     return "plugin";
+  }
+  if (findLinearProviderMentionReferenceForToken(path, options?.mentionReferences)) {
+    return "linear";
   }
   return "path";
 }

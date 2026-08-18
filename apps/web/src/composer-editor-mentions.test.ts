@@ -337,5 +337,18 @@ describe("splitPromptIntoDisplaySegments", () => {
       { type: "text", text: "Use " },
       { type: "mention", path: "linear", kind: "plugin", tokenLength: "@linear".length },
     ]);
+    expect(
+      splitPromptIntoDisplaySegments('See @"ALE-22 Kanban"', [
+        { name: "ALE-22 Kanban", path: "linear://ALE-22" },
+      ]),
+    ).toEqual([
+      { type: "text", text: "See " },
+      {
+        type: "mention",
+        path: "ALE-22 Kanban",
+        kind: "linear",
+        tokenLength: '@"ALE-22 Kanban"'.length,
+      },
+    ]);
   });
 });

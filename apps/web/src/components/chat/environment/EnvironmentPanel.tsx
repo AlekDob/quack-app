@@ -15,6 +15,7 @@ import type {
   PinnedMessage,
   ProjectId,
   ProviderKind,
+  ProviderMentionReference,
   ResolvedKeybindingsConfig,
   ThreadId,
   ThreadMarker,
@@ -50,6 +51,7 @@ import {
 import { EnvironmentUsageSection } from "./EnvironmentUsageSection";
 import { EnvironmentLocalServersSection } from "./EnvironmentLocalServersSection";
 import { EnvironmentPullRequestSection } from "./EnvironmentPullRequestSection";
+import { EnvironmentLinearSection } from "./EnvironmentLinearSection";
 import { EnvironmentMarkersSection } from "./EnvironmentMarkersSection";
 import { EnvironmentStudioOutputsSection } from "./EnvironmentStudioOutputsSection";
 import { EnvironmentNotesSection } from "./EnvironmentNotesSection";
@@ -149,6 +151,8 @@ export interface EnvironmentPanelProps {
   onOpenAutomation: (definition: AutomationDefinition) => void;
   /** Open the repository URL in the in-app browser panel. */
   onOpenGithubRepository?: (url: string) => void;
+  /** Unique Linear issue mentions from this chat's composer draft and sent user messages. */
+  linearMentions?: ReadonlyArray<ProviderMentionReference>;
   /** Scroll the transcript to a pinned message. */
   onJumpToPinnedMessage: (messageId: MessageId) => void;
   /** Toggle a pinned message's done state (strikethrough; stays pinned). */
@@ -239,6 +243,7 @@ export function EnvironmentPanel({
   onToggleDiff,
   onOpenAutomation,
   onOpenGithubRepository,
+  linearMentions: linearMentionsProp,
   onJumpToPinnedMessage,
   onTogglePinnedMessageDone,
   onUnpinMessage,
@@ -254,6 +259,7 @@ export function EnvironmentPanel({
 }: EnvironmentPanelProps) {
   const githubRepository = githubRepositoryProp ?? null;
   const githubRepositories = githubRepositoriesProp ?? [];
+  const linearMentions = linearMentionsProp ?? [];
   const studioFolderPath = studioFolderPathProp ?? null;
   const diffDisabledReason = diffDisabledReasonProp ?? null;
   const recap = recapProp ?? null;
@@ -411,6 +417,14 @@ export function EnvironmentPanel({
           projectId={activeProjectId}
           configuredRepositories={githubRepositories}
           onOpenUrl={onOpenGithubRepository}
+          onClose={onClose}
+        />
+      ) : null}
+
+      {settings.showEnvironmentLinear ? (
+        <EnvironmentLinearSection
+          mentions={linearMentions}
+          {...(onOpenGithubRepository ? { onOpenUrl: onOpenGithubRepository } : {})}
           onClose={onClose}
         />
       ) : null}

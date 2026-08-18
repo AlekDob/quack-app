@@ -54,6 +54,12 @@ export type SearchableModelOption = {
 
 const THREAD_MENTION_SUGGESTION_LIMIT = 20;
 
+/** `@+` (optional title after the plus) opens create-issue as the first mention row. */
+export function linearComposerCreateQuery(query: string): string | null {
+  if (!query.startsWith("+")) return null;
+  return query.slice(1).trim();
+}
+
 function threadSuggestionTitle(title: string): string {
   return title.trim() || "Untitled thread";
 }
@@ -359,36 +365,46 @@ export function useComposerCommandMenuItems(input: {
           query: composerTrigger.query,
         })
       : [];
-    // Linear is server-filtered, so the raw list is shown as-is; the last row always
-    // offers creating the ticket the user is evidently looking for.
+    const createQuery = linearComposerCreateQuery(composerTrigger.query);
+    const linearCreateItem = {
+      id: "linear-create",
+      type: "linear-create" as const,
+      title: createQuery ?? composerTrigger.query.trim(),
+      label: "New Linear issue",
+      description: "Create a Linear issue",
+    } satisfies ComposerCommandItem;
+    const linearIssueItems = (linearIssues ?? []).map((issue) => ({
+      id: `linear-issue:${issue.id}`,
+      type: "linear-issue" as const,
+      issue,
+      label: `${issue.identifier} ${issue.title}`,
+      description: issue.projectName ?? "",
+    }));
     const linearItems: ComposerCommandItem[] = linearConnected
-      ? [
-          ...(linearIssues ?? []).map((issue) => ({
-            id: `linear-issue:${issue.id}`,
-            type: "linear-issue" as const,
-            issue,
-            label: `${issue.identifier} ${issue.title}`,
-            description: issue.projectName ?? "",
-          })),
-          {
-            id: "linear-create",
-            type: "linear-create" as const,
-            title: composerTrigger.query.trim(),
-            label: "New Linear issue",
-            description: "Create a ticket and rename this chat",
-          },
-        ]
+      ? createQuery !== null
+        ? [linearCreateItem, ...linearIssueItems]
+        : [...linearIssueItems, linearCreateItem]
       : [];
     // Keep mention suggestions ordered by primary intent: plugins and chats
-    // first, then local context, then subagent delegation targets.
-    return [
-      ...pluginItems,
-      ...threadItems,
-      ...localRootItems,
-      ...pathItems,
-      ...agentItems,
-      ...linearItems,
-    ];
+    // first, then local context, then subagent delegation targets. `@+` puts
+    // Linear create first so groupCommandItems can lift that section.
+    return createQuery !== null
+      ? [
+          ...linearItems,
+          ...pluginItems,
+          ...threadItems,
+          ...localRootItems,
+          ...pathItems,
+          ...agentItems,
+        ]
+      : [
+          ...pluginItems,
+          ...threadItems,
+          ...localRootItems,
+          ...pathItems,
+          ...agentItems,
+          ...linearItems,
+        ];
   }
 
   if (composerTrigger.kind === "slash-command") {

@@ -6,6 +6,7 @@ import {
 import {
   createComposerMentionTokenRegex,
   extractComposerMentionPath,
+  findLinearProviderMentionReferenceForToken,
   findThreadProviderMentionReferenceForToken,
   isPluginProviderMentionReference,
   providerMentionMatchesToken,
@@ -27,7 +28,7 @@ export type ComposerPromptSegment =
   | {
       type: "mention";
       path: string;
-      kind?: "path" | "plugin" | "thread";
+      kind?: "path" | "plugin" | "thread" | "linear";
       threadId?: string;
       /**
        * Raw token length in the source text (`@name` vs `@"name with spaces"`).
@@ -332,6 +333,10 @@ function splitTextIntoPromptSegments(
             isPluginProviderMentionReference(mention) &&
             providerMentionMatchesToken(mention, match.value),
         ) ?? false;
+      const linearMention = findLinearProviderMentionReferenceForToken(
+        match.value,
+        options.mentionReferences,
+      );
       const tokenLength = match.end - match.start;
       const threadId = threadMention ? threadIdFromThreadMentionPath(threadMention.path) : null;
       segments.push(
@@ -345,7 +350,9 @@ function splitTextIntoPromptSegments(
             }
           : isPluginMention
             ? { type: "mention", path: match.value, kind: "plugin", tokenLength }
-            : { type: "mention", path: match.value, tokenLength },
+            : linearMention
+              ? { type: "mention", path: match.value, kind: "linear", tokenLength }
+              : { type: "mention", path: match.value, tokenLength },
       );
     } else if (match.kind === "slash-command") {
       segments.push({ type: "slash-command", command: match.command });

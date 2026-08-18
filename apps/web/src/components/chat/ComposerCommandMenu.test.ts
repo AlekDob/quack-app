@@ -88,6 +88,51 @@ describe("groupCommandItems", () => {
     ]);
   });
 
+  it("lifts Linear create to the first mention group when it is the first item", () => {
+    const createItem: ComposerCommandItem = {
+      id: "linear-create",
+      type: "linear-create",
+      title: "",
+      label: "New Linear issue",
+      description: "Create a Linear issue",
+    };
+    const pathItem: ComposerCommandItem = {
+      id: "path:file:/workspace/AGENTS.md",
+      type: "path",
+      path: "/workspace/AGENTS.md",
+      pathKind: "file",
+      label: "AGENTS.md",
+      description: "/workspace",
+    };
+    const issueItem: ComposerCommandItem = {
+      id: "linear-issue:ale-22",
+      type: "linear-issue",
+      issue: {
+        id: "issue-1",
+        identifier: "ALE-22",
+        title: "Kanban",
+        url: "https://linear.app/issue/ALE-22",
+        stateName: "In Progress",
+        projectName: "Quack",
+      },
+      label: "ALE-22 Kanban",
+      description: "Quack",
+    };
+
+    expect(groupCommandItems([createItem, pathItem, issueItem], "mention", true)).toEqual([
+      {
+        id: "linear",
+        label: "Linear",
+        items: [createItem, issueItem],
+      },
+      {
+        id: "local",
+        label: "Local",
+        items: [pathItem],
+      },
+    ]);
+  });
+
   it("groups slash-menu skills separately from app and provider commands", () => {
     const items: ComposerCommandItem[] = [
       {

@@ -99,6 +99,13 @@ export const SETTINGS_SEARCH_ENTRIES: readonly SettingsSearchEntry[] = [
       "Show the open pull request CI checks and review comments in the chat Environment panel. pr fix github",
   },
   {
+    id: "general:environment-linear",
+    section: "general",
+    title: "Linear",
+    keywords:
+      "Show Linear issues mentioned in this chat in the Environment panel. ticket issue chip",
+  },
+  {
     id: "general:environment-editor",
     section: "general",
     title: "Editor",
@@ -417,10 +424,24 @@ export const SETTINGS_SEARCH_ENTRIES: readonly SettingsSearchEntry[] = [
       "Pair Codex Claude and other local MCP clients with scoped project access. revoke credential task create wait read worktree approval",
   },
   {
-    id: "integrations:linear",
-    section: "integrations",
+    id: "linear:issues",
+    section: "linear",
+    title: "Issues in chat",
+    keywords:
+      "Linear issue ticket mention composer @ pick create rename thread assignee branch chip",
+  },
+  {
+    id: "linear:rename-chat",
+    section: "linear",
+    title: "Rename chat when picking an issue",
+    keywords: "Linear rename chat ask always never title ticket issue",
+  },
+  {
+    id: "linear:api-key",
+    section: "linear",
     title: "API key",
-    keywords: "Linear issue ticket api key connect mention rename thread",
+    keywords:
+      "Linear personal API key lin_api secret Security and access connect disconnect ticket",
   },
   {
     id: "advanced:version",

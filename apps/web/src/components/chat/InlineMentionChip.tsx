@@ -11,8 +11,14 @@
 
 import { type MouseEvent, type ReactNode } from "react";
 import type { ProviderMentionReference } from "@synara/contracts";
+import { identifierFromLinearMentionPath } from "@synara/shared/linearMentions";
 import { basenameOfPath, pathLooksLikeKnownFile } from "~/file-icons";
+import {
+  findLinearProviderMentionReferenceForToken,
+  resolveMentionChipKind,
+} from "~/lib/composerMentions";
 import { showFileReferenceContextMenu } from "~/lib/fileReferenceContextMenu";
+import { resolveLinearIssueUrl } from "~/lib/linearIssueUrls";
 import { openWorkspaceFileReference, useWorkspaceFileOpener } from "~/lib/workspaceFileOpener";
 import { readNativeApi } from "~/nativeApi";
 import {
@@ -21,7 +27,6 @@ import {
 } from "../composerInlineChip";
 import { InlineChipContent } from "../InlineChip";
 import { MentionChipIcon, type MentionChipKind } from "./MentionChipIcon";
-import { resolveMentionChipKind } from "~/lib/composerMentions";
 
 interface InlineMentionChipProps {
   path: string;
@@ -47,8 +52,22 @@ export function InlineMentionChip(props: InlineMentionChipProps) {
     ...(props.kind ? { kind: props.kind } : {}),
     ...(props.mentionReferences ? { mentionReferences: props.mentionReferences } : {}),
   });
+  const linearMention = findLinearProviderMentionReferenceForToken(
+    props.path,
+    props.mentionReferences,
+  );
+  const linearIdentifier =
+    identifierFromLinearMentionPath(props.path) ??
+    (linearMention ? identifierFromLinearMentionPath(linearMention.path) : null);
+  const linearHref =
+    props.href ?? (linearIdentifier ? resolveLinearIssueUrl(linearIdentifier) : undefined);
   const label =
-    props.label ?? (resolvedKind === "thread" ? props.path : basenameOfPath(props.path));
+    props.label ??
+    (resolvedKind === "linear"
+      ? (linearMention?.name ?? linearIdentifier ?? props.path)
+      : resolvedKind === "thread"
+        ? props.path
+        : basenameOfPath(props.path));
   const showFileContextMenu = isFilePathChip(resolvedKind);
   const handleFileContextMenu = (event: MouseEvent<HTMLElement>) => {
     if (!showFileContextMenu || !readNativeApi()) {
@@ -85,10 +104,11 @@ export function InlineMentionChip(props: InlineMentionChipProps) {
     props.onActivate === undefined &&
     opener !== null &&
     (props.kind === undefined || props.kind === "path") &&
+    resolvedKind !== "linear" &&
     pathLooksLikeKnownFile(props.path);
 
-  if (props.href !== undefined || props.onActivate || contextOpenable) {
-    const href = props.href ?? (contextOpenable ? props.path : undefined);
+  if (props.href !== undefined || props.onActivate || contextOpenable || linearHref !== undefined) {
+    const href = props.href ?? linearHref ?? (contextOpenable ? props.path : undefined);
     const handleActivate =
       props.onActivate ??
       (contextOpenable
@@ -108,6 +128,9 @@ export function InlineMentionChip(props: InlineMentionChipProps) {
         className={COMPOSER_INLINE_MENTION_CHIP_INTERACTIVE_CLASS_NAME}
         title={props.path}
         {...(href !== undefined ? { href } : {})}
+        {...(linearHref !== undefined && props.href === undefined && props.onActivate === undefined
+          ? { target: "_blank", rel: "noreferrer" }
+          : {})}
         {...(handleActivate ? { onClick: handleActivate } : {})}
         {...(handleHoverPrefetch
           ? { onPointerEnter: handleHoverPrefetch, onFocus: handleHoverPrefetch }

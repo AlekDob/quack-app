@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ComposerThreadMentionSource, Project } from "../types";
-import { buildThreadMentionComposerItems } from "./useComposerCommandMenuItems";
+import { buildThreadMentionComposerItems, linearComposerCreateQuery } from "./useComposerCommandMenuItems";
 
 function project(id: string, kind: Project["kind"], name: string): Project {
   return {
@@ -188,5 +188,13 @@ describe("buildThreadMentionComposerItems", () => {
 
     const names = items.map((item) => (item.type === "thread" ? item.mention.name : ""));
     expect(names).toEqual(["Release (aaaaaa)", "release (bbbbbb)"]);
+  });
+});
+
+describe("linearComposerCreateQuery", () => {
+  it("treats a leading + as the create-issue shortcut", () => {
+    expect(linearComposerCreateQuery("+")).toBe("");
+    expect(linearComposerCreateQuery("+Kanban")).toBe("Kanban");
+    expect(linearComposerCreateQuery("ALE-22")).toBeNull();
   });
 });

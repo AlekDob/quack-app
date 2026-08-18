@@ -576,6 +576,14 @@ function SettingsRouteView() {
           })}
 
           {renderBooleanSettingRow({
+            settingKey: "showEnvironmentLinear",
+            title: "Linear",
+            description: "Show Linear issues mentioned in this chat in the Environment panel.",
+            resetLabel: "Linear section",
+            ariaLabel: "Show the Linear section in the Environment panel",
+          })}
+
+          {renderBooleanSettingRow({
             settingKey: "showEnvironmentEditor",
             title: "Editor",
             description:
@@ -1131,7 +1139,7 @@ function SettingsRouteView() {
                   updateSettings={updateSettings}
                 />
                 <ExternalMcpSettingsPanel active={activeSection === "integrations"} />
-                <LinearSettingsPanel active={activeSection === "integrations"} />
+                <LinearSettingsPanel active={activeSection === "linear"} />
                 <AdvancedSettingsPanel
                   active={activeSection === "advanced"}
                   onOpenReleaseHistory={() => setReleaseHistoryOpen(true)}
