@@ -5766,10 +5766,24 @@ export default function ChatView({
     });
   }, [activeThread]);
 
+  // The turn stays "running" until the provider confirms a terminal event, so
+  // without local state the stop control looks dead for as long as that takes.
+  // Keyed on thread+turn: a new turn (or another thread) clears it by itself.
+  const stopControlKey = activeThreadId ? `${activeThreadId}:${activeLatestTurnId ?? ""}` : null;
+  const [stopRequestedKey, setStopRequestedKey] = useState<string | null>(null);
+  const isStopPending = stopControlKey !== null && stopRequestedKey === stopControlKey;
+  useEffect(() => {
+    if (phase !== "running") {
+      setStopRequestedKey(null);
+    }
+  }, [phase]);
+
   // A rejected interrupt (orchestration dispatch timeout, dead runtime) leaves the
   // UI spinning with no explanation, so the stop affordances report it.
   const onInterruptFromStopControl = useCallback(() => {
+    setStopRequestedKey(stopControlKey);
     void onInterrupt().catch((error: unknown) => {
+      setStopRequestedKey(null);
       toastManager.add({
         type: "error",
         title: "Could not stop the current response",
@@ -5779,7 +5793,7 @@ export default function ChatView({
             : "The interrupt request failed. Try again in a moment.",
       });
     });
-  }, [onInterrupt]);
+  }, [onInterrupt, stopControlKey]);
 
   const onStopWorkflowRun = useCallback(async () => {
     const api = readNativeApi();
@@ -11512,12 +11526,22 @@ export default function ChatView({
                           size="icon-xs"
                           className="sm:size-[26px]"
                           onClick={onInterruptFromStopControl}
-                          aria-label="Stop generation"
-                          title="Stop the current response. On Mac, press Ctrl+C to interrupt."
+                          aria-label={isStopPending ? "Stopping generation" : "Stop generation"}
+                          aria-busy={isStopPending}
+                          title={
+                            isStopPending
+                              ? "Stopping the current response..."
+                              : "Stop the current response. On Mac, press Ctrl+C to interrupt."
+                          }
                         >
                           <span
                             aria-hidden="true"
-                            className="block size-2 rounded-[1px] bg-current"
+                            className={cn(
+                              "block size-2 rounded-[1px] bg-current",
+                              // Immediate acknowledgement: the provider can take
+                              // seconds to settle the turn.
+                              isStopPending && "animate-pulse opacity-60",
+                            )}
                           />
                         </Button>
                       ) : pendingUserInputs.length === 0 &&
