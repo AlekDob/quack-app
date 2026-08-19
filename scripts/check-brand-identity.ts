@@ -51,8 +51,12 @@ const approvedVisualAssetDigests = new Map<string, string>([
     "0b4be139f13dd08885a1aac26fc1f7c623697db157777d16360e985c93d47bcf",
   ],
   [
-    "assets/prod/readme-screenshot.jpeg",
-    "0b4be139f13dd08885a1aac26fc1f7c623697db157777d16360e985c93d47bcf",
+    "assets/prod/quack-projects.png",
+    "93a913060aa6a8fd196a1308b0886278ee04bb31c8da0d6b82eb90a52552911a",
+  ],
+  [
+    "assets/prod/quack-team.png",
+    "becc01177487eebe1e602d339d4f7ca968c8fdd1e9b2ff3803a650a3e992692c",
   ],
 ]);
 
