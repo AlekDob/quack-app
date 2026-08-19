@@ -69,6 +69,10 @@ Quack is a soft-fork of [Synara](https://github.com/Emanuele-web04/synara): Quac
 
 The runtime, packages, and MCP surface stay Synara-shaped so upstream merges remain practical. Details: [docs/quack-soft-fork.md](./docs/quack-soft-fork.md).
 
+## Author
+
+Built by [Alek Dobrohotov](https://alekdob.com).
+
 ## License
 
 MIT. See [LICENSE](./LICENSE).
