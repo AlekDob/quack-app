@@ -12,13 +12,13 @@ Quack is a local-first workspace for coding with the AI agents and subscriptions
 
 Sign in with the CLI accounts you already have. Quack talks to nine providers:
 
-| | |
-| --- | --- |
-| Codex | Claude Code |
-| Cursor | Antigravity |
-| Grok | Factory Droid |
-| Kilo Code | OpenCode |
-| Pi | |
+|           |               |
+| --------- | ------------- |
+| Codex     | Claude Code   |
+| Cursor    | Antigravity   |
+| Grok      | Factory Droid |
+| Kilo Code | OpenCode      |
+| Pi        |               |
 
 Each provider keeps its own models and options — reasoning effort, thinking budget, context window, fast mode.
 
@@ -62,6 +62,18 @@ Without both variables the analytics layer stays silent.
 ## Status
 
 Early. Expect bugs, rough edges, and fast-moving internals. macOS only for now.
+
+## Contributing
+
+PRs are welcome, and so is just talking to me.
+
+Email **[gmail@alekdob.com](mailto:gmail@alekdob.com)** for ideas, PRs you want feedback on, or collaboration. For anything bigger than a bug fix, write first — it saves you a wasted weekend.
+
+Details: [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+## Support
+
+Quack is free and MIT. If it saves you time, [buy me a pizza](https://alekdob.gumroad.com/l/obgae).
 
 ## Origins
 

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Email Alek
+    url: mailto:gmail@alekdob.com
+    about: Ideas, PRs you want feedback on, collaboration. I read everything.
+  - name: Buy me a pizza
+    url: https://alekdob.gumroad.com/l/obgae
+    about: Quack is free and MIT. This just keeps me building.

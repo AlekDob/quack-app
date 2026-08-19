@@ -1,65 +1,40 @@
 # Contributing
 
-## Read This First
+PRs are welcome. So are ideas, bug reports, and "hey, have you thought about…" messages.
 
-We are accepting focused contributions, especially small bug fixes, reliability fixes, performance improvements, and maintenance work.
+Quack is early and moves fast. Small, focused changes get merged quickest.
 
-You can open an issue or PR, but please do so knowing that Synara is still early and we are keeping scope, quality, and direction tight.
+## Talk to me first (the easy path)
 
-Large, unfocused, or direction-changing PRs may still be closed quickly.
+The fastest way in is not a PR. It's an email.
 
-PRs are automatically labeled with a `vouch:*` trust status and a `size:*` diff size based on changed lines.
+**[gmail@alekdob.com](mailto:gmail@alekdob.com)** — ideas, PRs you want feedback on, collaboration, anything.
 
-If you are an external contributor, expect `vouch:unvouched` until we explicitly add you to [.github/VOUCHED.td](.github/VOUCHED.td).
+I read everything. If you want to build something bigger inside Quack, write to me before you spend a weekend on it. I'll tell you straight if it fits.
 
-## What We Are Most Likely To Accept
+You can also [open an issue](https://github.com/AlekDob/quack-app/issues/new/choose) if you prefer to keep it public.
 
-Small, focused bug fixes.
+## Opening a PR
 
-Small reliability fixes.
+1. Fork, branch, change one thing.
+2. Run `bun fmt`, `bun lint`, `bun typecheck`. CI runs the same checks.
+3. Say what changed and why.
+4. UI change? Add a before/after screenshot. Animation or interaction? A short video.
 
-Small performance improvements.
+That's it. No CLA, no checklist theater.
 
-Tightly scoped maintenance work that clearly improves the project without changing its direction.
+## What gets merged fastest
 
-## What We Are Least Likely To Accept
+Bug fixes. Reliability fixes. Performance work. Docs that unstick someone.
 
-Large PRs.
+## What needs a conversation first
 
-Drive-by feature work.
+New features, big refactors, anything that changes where the product is going. Not because the answer is no — because I'd rather agree on the shape before you write it.
 
-Opinionated rewrites.
+Email me. It takes five minutes and saves you a wasted PR.
 
-Anything that expands product scope without us asking for it first.
+## Support the project
 
-If you open a 1,000+ line PR full of new features, we will probably close it quickly and remember that you ignored the clearly written instructions.
+Quack is free and MIT. If it saves you time, you can [buy me a pizza](https://alekdob.gumroad.com/l/obgae).
 
-## If You Still Want To Open A PR
-
-Keep it small.
-
-Explain exactly what changed.
-
-Explain exactly why the change should exist.
-
-Do not mix unrelated fixes together.
-
-If the PR makes anything resembling a UI change, include clear before/after images.
-
-If the change depends on motion, timing, transitions, or interaction details, include a short video.
-
-If we have to guess what changed, we are much less likely to review it.
-
-## Issues First
-
-If you are thinking about a non-trivial change, open an issue first.
-
-That gives you a chance to check whether the direction fits before spending time on a larger patch.
-
-## Be Realistic
-
-Opening a PR does not create an obligation on our side.
-
-We may close it. We may ignore it. We may ask you to shrink it. We may reimplement the idea ourselves later.
-
-If you are fine with that, proceed.
+Not required, never paywalled. It just keeps me building.
