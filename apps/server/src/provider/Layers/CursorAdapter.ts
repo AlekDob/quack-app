@@ -736,6 +736,20 @@ export function makeCursorAdapter(
             ...(resumeSessionId ? { resumeSessionId } : {}),
             clientInfo: { name: "Quack", version: "0.0.0" },
             startupTimeouts: CURSOR_ACP_STARTUP_TIMEOUTS,
+            onResumeFallback: ({ error }) =>
+              Effect.gen(function* () {
+                yield* offerRuntimeEvent(input.lifecycleGeneration, {
+                  type: "runtime.warning",
+                  ...(yield* makeEventStamp()),
+                  provider: PROVIDER,
+                  threadId: input.threadId,
+                  payload: {
+                    message:
+                      "Cursor could not reopen this conversation, so a new Cursor session was started. The agent has no memory of the earlier messages.",
+                    detail: { reason: "resume_failed", cause: cursorAcpFailureDetail(error) },
+                  },
+                });
+              }),
             ...(agentGatewayCredentials
               ? {
                   buildMcpServers: (initializeResult) =>

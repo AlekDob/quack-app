@@ -22,6 +22,7 @@ const emitReasoningThenToolCall = process.env.SYNARA_ACP_EMIT_REASONING_THEN_TOO
 const emitGenericToolPlaceholders = process.env.SYNARA_ACP_EMIT_GENERIC_TOOL_PLACEHOLDERS === "1";
 const emitAskQuestion = process.env.SYNARA_ACP_EMIT_ASK_QUESTION === "1";
 const failSessionNewOnce = process.env.SYNARA_ACP_FAIL_SESSION_NEW_ONCE === "1";
+const failSessionLoad = process.env.SYNARA_ACP_FAIL_SESSION_LOAD === "1";
 const failSetConfigOption = process.env.SYNARA_ACP_FAIL_SET_CONFIG_OPTION === "1";
 const exitOnSetConfigOption = process.env.SYNARA_ACP_EXIT_ON_SET_CONFIG_OPTION === "1";
 const promptResponseText = process.env.SYNARA_ACP_PROMPT_RESPONSE_TEXT;
@@ -319,6 +320,10 @@ app.onRequest(OfficialAcp.methods.agent.session.new, ({ client: context }) => {
 });
 
 app.onRequest(OfficialAcp.methods.agent.session.load, ({ client: context, params: request }) => {
+  if (failSessionLoad) {
+    // Mirrors cursor-agent's bare internal error on session/load (no `data`).
+    throw new OfficialAcp.RequestError(-32603, "Internal error");
+  }
   const client = makeClient(context);
   return runEffect(
     client

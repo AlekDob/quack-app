@@ -225,6 +225,17 @@ export interface AcpSessionRuntimeOptions {
   readonly authenticateMeta?: Record<string, unknown>;
   /** Optional one-time retry for a fresh session/new failure. Never applies to resume/load. */
   readonly freshSessionRetry?: AcpFreshSessionRetryPolicy;
+  /**
+   * When reopening the stored session fails, start a fresh one instead of
+   * failing startup. Safe because resume/load runs before any prompt is sent,
+   * so no turn can be delivered twice; the cost is losing the agent-side
+   * transcript, which `onResumeFallback` must report to the user.
+   */
+  readonly resumeFallbackToNewSession?: boolean;
+  readonly onResumeFallback?: (input: {
+    readonly previousSessionId: string;
+    readonly error: AcpErrors.AcpError;
+  }) => Effect.Effect<void>;
   /** Overrides for {@link DEFAULT_ACP_SESSION_STARTUP_TIMEOUTS}. */
   readonly startupTimeouts?: Partial<AcpSessionStartupTimeouts>;
   readonly requestLogger?: (event: AcpSessionRequestLogEvent) => Effect.Effect<void, never>;
@@ -1109,6 +1120,25 @@ const makeAcpSessionRuntime = (
 
       const mcpServers = options.buildMcpServers?.(initializeResult) ?? [];
 
+      const createFreshSession = Effect.suspend(() => {
+        // Fresh session: accept updates from before session/new so any early
+        // agent output emitted while the request is in flight is buffered.
+        acceptingSessionUpdates = true;
+        const createPayload = {
+          cwd: options.cwd,
+          mcpServers,
+          ...(options.sessionMeta ? { _meta: options.sessionMeta } : {}),
+        } satisfies Acp.NewSessionRequest;
+        return withStartupTimeout(
+          "session/new",
+          startupTimeouts.sessionSetupMs,
+          runAcpFreshSessionSetup(
+            runLoggedRequest("session/new", createPayload, acp.agent.createSession(createPayload)),
+            options.freshSessionRetry,
+          ),
+        );
+      });
+
       let sessionId: string;
       let sessionSetupResult:
         | Acp.LoadSessionResponse
@@ -1116,9 +1146,10 @@ const makeAcpSessionRuntime = (
         | Acp.ResumeSessionResponse;
       let resumedExistingSession = false;
       let sessionSetupMethod: AcpSessionRuntimeStartResult["sessionSetupMethod"] = "new";
-      if (options.resumeSessionId) {
+      const resumeSessionId = options.resumeSessionId;
+      if (resumeSessionId) {
         const resumePayload = {
-          sessionId: options.resumeSessionId,
+          sessionId: resumeSessionId,
           cwd: options.cwd,
           mcpServers,
           ...(options.sessionMeta ? { _meta: options.sessionMeta } : {}),
@@ -1133,7 +1164,7 @@ const makeAcpSessionRuntime = (
               "ACP agent cannot reopen the requested session because it advertises neither session/resume nor session/load.",
           });
         }
-        const resumed = yield* supportsResume
+        const reopenSession = supportsResume
           ? withStartupTimeout(
               "session/resume",
               startupTimeouts.sessionSetupMs,
@@ -1145,7 +1176,7 @@ const makeAcpSessionRuntime = (
             )
           : (() => {
               const loadPayload = {
-                sessionId: options.resumeSessionId,
+                sessionId: resumeSessionId,
                 cwd: options.cwd,
                 mcpServers,
                 ...(options.sessionMeta ? { _meta: options.sessionMeta } : {}),
@@ -1156,29 +1187,42 @@ const makeAcpSessionRuntime = (
                 runLoggedRequest("session/load", loadPayload, acp.agent.loadSession(loadPayload)),
               );
             })();
-        // Resume/load failure is terminal. Retrying as session/new would create a second
-        // conversation and make delivery outcome ambiguous.
-        sessionId = options.resumeSessionId;
-        sessionSetupResult = resumed;
-        resumedExistingSession = true;
-        sessionSetupMethod = supportsResume ? "resume" : "load";
-      } else {
-        // Fresh session: accept updates from before session/new so any early
-        // agent output emitted while the request is in flight is buffered.
-        acceptingSessionUpdates = true;
-        const createPayload = {
-          cwd: options.cwd,
-          mcpServers,
-          ...(options.sessionMeta ? { _meta: options.sessionMeta } : {}),
-        } satisfies Acp.NewSessionRequest;
-        const created = yield* withStartupTimeout(
-          "session/new",
-          startupTimeouts.sessionSetupMs,
-          runAcpFreshSessionSetup(
-            runLoggedRequest("session/new", createPayload, acp.agent.createSession(createPayload)),
-            options.freshSessionRetry,
+        // Reopen failure is terminal unless the provider opted into the fresh-session
+        // fallback. Falling back cannot duplicate a turn (no prompt has been sent yet),
+        // but it does drop the agent-side transcript, so the caller must say so.
+        const outcome = yield* reopenSession.pipe(
+          Effect.map((result) => ({ kind: "reopened", result }) as const),
+          Effect.catch((error: AcpErrors.AcpError) =>
+            options.resumeFallbackToNewSession !== true
+              ? Effect.fail(error)
+              : Effect.gen(function* () {
+                  yield* Effect.logWarning("acp.session.reopen_failed_starting_fresh", {
+                    previousSessionId: resumeSessionId,
+                    method: supportsResume ? "session/resume" : "session/load",
+                    detail: error.message,
+                  });
+                  yield* (
+                    options.onResumeFallback?.({
+                      previousSessionId: resumeSessionId,
+                      error,
+                    }) ?? Effect.void
+                  );
+                  return { kind: "fresh", result: yield* createFreshSession } as const;
+                }),
           ),
         );
+        if (outcome.kind === "fresh") {
+          sessionId = outcome.result.sessionId;
+          sessionSetupResult = outcome.result;
+          sessionSetupMethod = "new";
+        } else {
+          sessionId = resumeSessionId;
+          sessionSetupResult = outcome.result;
+          resumedExistingSession = true;
+          sessionSetupMethod = supportsResume ? "resume" : "load";
+        }
+      } else {
+        const created = yield* createFreshSession;
         sessionId = created.sessionId;
         sessionSetupResult = created;
         sessionSetupMethod = "new";

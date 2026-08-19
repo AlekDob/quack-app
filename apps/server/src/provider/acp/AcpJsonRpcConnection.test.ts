@@ -271,6 +271,77 @@ describe("AcpSessionRuntime", () => {
     );
   });
 
+  it.effect("falls back to a fresh session when session/load fails and the fallback is on", () => {
+    const requestEvents: Array<AcpSessionRequestLogEvent> = [];
+    const fallbacks: Array<{ previousSessionId: string; detail: string }> = [];
+    return Effect.gen(function* () {
+      const runtime = yield* AcpSessionRuntime;
+      const started = yield* runtime.start();
+
+      expect(started.sessionSetupMethod).toBe("new");
+      expect(started.sessionId).toBe("mock-session-1");
+      expect(requestEvents.some((event) => event.method === "session/load")).toBe(true);
+      expect(requestEvents.some((event) => event.method === "session/new")).toBe(true);
+      expect(fallbacks).toHaveLength(1);
+      expect(fallbacks[0]?.previousSessionId).toBe("stale-session");
+    }).pipe(
+      Effect.provide(
+        AcpSessionRuntime.layer({
+          spawn: {
+            command: bunExe,
+            args: [mockAgentPath],
+            env: { VITEST: "true", SYNARA_ACP_FAIL_SESSION_LOAD: "1" },
+          },
+          cwd: process.cwd(),
+          resumeSessionId: "stale-session",
+          resumeFallbackToNewSession: true,
+          onResumeFallback: ({ previousSessionId, error }) =>
+            Effect.sync(() => {
+              fallbacks.push({ previousSessionId, detail: error.message });
+            }),
+          clientInfo: { name: "synara-test", version: "0.0.0" },
+          authMethodId: "test",
+          requestLogger: (event) =>
+            Effect.sync(() => {
+              requestEvents.push(event);
+            }),
+        }),
+      ),
+      Effect.scoped,
+      Effect.provide(NodeServices.layer),
+    );
+  });
+
+  it.effect("keeps a session/load failure terminal when the fallback is off", () => {
+    const requestEvents: Array<AcpSessionRequestLogEvent> = [];
+    return Effect.gen(function* () {
+      const runtime = yield* AcpSessionRuntime;
+      const started = yield* runtime.start().pipe(Effect.exit);
+      expect(Exit.isFailure(started)).toBe(true);
+      expect(requestEvents.some((event) => event.method === "session/new")).toBe(false);
+    }).pipe(
+      Effect.provide(
+        AcpSessionRuntime.layer({
+          spawn: {
+            command: bunExe,
+            args: [mockAgentPath],
+            env: { VITEST: "true", SYNARA_ACP_FAIL_SESSION_LOAD: "1" },
+          },
+          cwd: process.cwd(),
+          resumeSessionId: "stale-session",
+          clientInfo: { name: "synara-test", version: "0.0.0" },
+          authMethodId: "test",
+          requestLogger: (event) =>
+            Effect.sync(() => {
+              requestEvents.push(event);
+            }),
+        }),
+      ),
+      Effect.scoped,
+      Effect.provide(NodeServices.layer),
+    );
+  });
+
   it.effect("does not call session/load when the agent does not advertise it", () => {
     const requestEvents: Array<AcpSessionRequestLogEvent> = [];
     return Effect.gen(function* () {

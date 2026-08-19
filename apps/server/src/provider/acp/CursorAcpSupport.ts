@@ -132,6 +132,11 @@ export const makeCursorAcpRuntime = (
         authMethodId: "cursor_login",
         authenticateMeta: { headless: true },
         clientCapabilities: CURSOR_PARAMETERIZED_MODEL_PICKER_CAPABILITIES,
+        // cursor-agent fails session/load on its own sometimes (bare JSON-RPC
+        // -32603, or -32602 "Session not found" once its store rotates), which
+        // used to kill the turn. A fresh session loses the agent transcript but
+        // keeps the thread usable; the adapter warns the user.
+        resumeFallbackToNewSession: true,
       }).pipe(
         Layer.provide(
           Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, input.childProcessSpawner),
