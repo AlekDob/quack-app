@@ -986,6 +986,7 @@ function resolveEmbeddedCommitHash(): string | null {
 }
 
 declare const __SYNARA_WINDOWS_UPDATER_PUBLISHER__: string;
+declare const __SYNARA_POSTHOG_KEY__: string;
 
 function resolveEmbeddedWindowsPublisherSubjects(): string[] {
   if (!app.isPackaged || process.platform !== "win32") {
@@ -3090,6 +3091,11 @@ function backendEnv(): NodeJS.ProcessEnv {
     SYNARA_HOME: BASE_DIR,
     SYNARA_AUTH_TOKEN: backendAuthToken,
     SYNARA_DESKTOP_SHUTDOWN_TOKEN: DESKTOP_BACKEND_SHUTDOWN_TOKEN,
+    // Official builds carry the key; source builds carry "" and stay silent.
+    // An explicit env var still wins, so anyone can point this elsewhere.
+    ...(__SYNARA_POSTHOG_KEY__ && !process.env.SYNARA_POSTHOG_KEY
+      ? { SYNARA_POSTHOG_KEY: __SYNARA_POSTHOG_KEY__, SYNARA_TELEMETRY_ENABLED: "true" }
+      : {}),
   };
   // The backend runs the same login-shell probe at startup and does not begin listening
   // until it returns, so an unmarked child serializes a second ~1s hydration behind ours.

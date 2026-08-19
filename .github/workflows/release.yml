@@ -223,6 +223,7 @@ jobs:
           AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE_NAME: ${{ secrets.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE_NAME }}
           AZURE_TRUSTED_SIGNING_PUBLISHER_NAME: ${{ secrets.AZURE_TRUSTED_SIGNING_PUBLISHER_NAME }}
           AZURE_TRUSTED_SIGNING_SUBJECT_DN: ${{ secrets.AZURE_TRUSTED_SIGNING_SUBJECT_DN }}
+          SYNARA_POSTHOG_KEY: ${{ secrets.SYNARA_POSTHOG_KEY }}
           SYNARA_PUBLISH_RELEASE: ${{ needs.preflight.outputs.publish_release }}
           ALLOW_UNSIGNED_WINDOWS_PUBLICATION: ${{ vars.SYNARA_ALLOW_UNSIGNED_WINDOWS_RELEASE == needs.preflight.outputs.version }}
           SOURCE_COMMIT: ${{ needs.preflight.outputs.source_commit }}
