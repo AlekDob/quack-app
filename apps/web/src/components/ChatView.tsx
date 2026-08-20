@@ -308,6 +308,7 @@ import {
 import { selectRightDockState, useRightDockStore } from "../rightDockStore";
 import { useStore } from "../store";
 import { LinearCreateIssueDialog } from "./chat/LinearCreateIssueDialog";
+import { readProjectLinearDefaults } from "~/lib/projectLinearDefaults";
 import { RenameThreadDialog } from "./RenameThreadDialog";
 import { rememberLinearIssueUrl } from "~/lib/linearIssueUrls";
 import { getThreadFromState } from "../threadDerivation";
@@ -11833,6 +11834,7 @@ export default function ChatView({
       />
       <LinearCreateIssueDialog
         draftTitle={linearCreateDraftTitle}
+        defaults={activeProjectId === null ? null : readProjectLinearDefaults(activeProjectId)}
         onClose={() => setLinearCreateDraftTitle(null)}
         onCreated={(issue) => {
           appendComposerPromptText(

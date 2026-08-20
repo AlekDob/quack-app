@@ -5,7 +5,7 @@ stack: Effect / Node.js / React (Vite) / TypeScript
 created: 2026-08-14
 startDate: 2026-08-14
 endDate:
-last_verified: 2026-08-18
+last_verified: 2026-08-20
 status: active
 tags: [linear, composer, mention, settings, secrets, websocket, environment, mcp]
 ---
@@ -26,7 +26,9 @@ Deciso con l'utente:
 
 Vedi [018-linear-project-routing.md](018-linear-project-routing.md) per il deep-link `quack://open?source=linear`. Indipendente da questa feature.
 
-Diario: [2026-08-18](../diary/2026-08-18.md) (N workspace + MCP pass-through; chip + Environment + `@+`); [2026-08-14](../diary/2026-08-14.md) (prima integrazione, solo rinomina).
+**2026-08-20 (QUACK-3):** "Edit project" (Sidebar) ha un campo opzionale team/progetto Linear per progetto, dietro un disclosure "Linear (optional)" (chiuso di default, riepilogo inline `TEAM · Progetto` / `Not set`). Salvato in localStorage per macchina (`projectLinearDefaults.ts`), non nel read model server — è un default UI, non metadata da sincronizzare tra macchine. `LinearCreateIssueDialog` lo legge per pre-selezionare workspace/team/progetto invece del primo team della lista.
+
+Diario: [2026-08-20](../diary/2026-08-20.md) (associazione Linear per progetto + disclosure UI); [2026-08-18](../diary/2026-08-18.md) (N workspace + MCP pass-through; chip + Environment + `@+`); [2026-08-14](../diary/2026-08-14.md) (prima integrazione, solo rinomina).
 
 ### Files
 
@@ -55,8 +57,12 @@ Diario: [2026-08-18](../diary/2026-08-18.md) (N workspace + MCP pass-through; ch
 | Component  | `apps/web/src/components/chat/MentionChipIcon.tsx`                          | Icona Linear su chip composer/messaggio                                                     |
 | Component  | `apps/web/src/components/chat/InlineMentionChip.tsx`                        | Label = nome; click apre Linear                                                             |
 | Component  | `apps/web/src/components/composer-nodes/index.tsx`                          | Label chip Lexical per kind `linear`                                                        |
-| Component  | `apps/web/src/components/chat/LinearCreateIssueDialog.tsx`                  | Workspace (se >1) + team + progetto                                                         |
-| Component  | `apps/web/src/components/ChatView.tsx`                                      | Insert mention, Ask/Always/Never, Environment mentions                                      |
+| Component  | `apps/web/src/components/chat/LinearCreateIssueDialog.tsx`                  | Workspace (se >1) + team + progetto; prop `defaults` pre-seleziona                          |
+| Component  | `apps/web/src/components/ChatView.tsx`                                      | Insert mention, Ask/Always/Never, Environment mentions, passa `defaults` al dialog create   |
+| Component  | `apps/web/src/components/ProjectSettingsDialog.tsx`                         | Campi team/progetto Linear per progetto, dietro disclosure "Linear (optional)"              |
+| Component  | `apps/web/src/components/Sidebar.tsx`                                       | Passa `projectId` a `ProjectSettingsDialog`                                                  |
+| Util       | `apps/web/src/lib/projectLinearDefaults.ts`                                 | `read/writeProjectLinearDefaults` — localStorage per macchina, chiave per projectId          |
+| Test       | `apps/web/src/lib/projectLinearDefaults.test.ts`                            | Round-trip, clear, ignora entry incomplete                                                   |
 | Component  | `apps/web/src/components/settings/LinearSettingsPanel.tsx`                  | Lista workspace + nome + add key + disconnect                                               |
 | Component  | `apps/web/src/components/chat/environment/EnvironmentLinearSection.tsx`     | Righe uniche per `linear://` path                                                           |
 | Component  | `apps/web/src/components/chat/environment/EnvironmentPanel.tsx`             | Sezione Linear dopo PR                                                                      |
@@ -80,7 +86,9 @@ Pick issue → token `formatComposerMentionToken(name)` + mention `{ name, path:
 
 `@+` / `@+Kanban` → `linearComposerCreateQuery` → create come prima voce; search Linear usa il testo dopo `+`.
 
-"New Linear issue" → dialog (workspace se >1, team, progetto) → `linear.createIssue` → stesso insert chip + policy rinomina.
+"New Linear issue" → dialog (workspace se >1, team, progetto) → `linear.createIssue` → stesso insert chip + policy rinomina. Team/progetto iniziali: default salvato per il project attivo (`readProjectLinearDefaults`), altrimenti primo team disponibile.
+
+Edit project → disclosure "Linear (optional)" → scegli team (filtra progetti per team) → `writeProjectLinearDefaults(projectId, …)` al Save. `null` (nessun team) rimuove l'associazione.
 
 Chip click → `issue.url` se in cache (keyed by path), altrimenti `https://linear.app/alekdob/issue/ALE-22`. Path vecchi `linear://ALE-22` restano validi.
 
@@ -100,6 +108,8 @@ Agenti: Codex overlay copia `config.toml` e sostituisce solo synara. Claude `set
 - `mergeAcpMcpServers(user, synara) → Acp.McpServer[]` — synara vince solo sul name `synara`
 - `loadUserAcpMcpServers({ provider, cwd }) → Acp.McpServer[]` — file assenti = lista vuota
 - `linearWorkspaceDisplayName(workspace) → string` — `label` utente, altrimenti nome org Linear
+- `readProjectLinearDefaults(projectId) → { workspaceId, teamId, projectId } | null` — null se manca team o non c'è entry
+- `writeProjectLinearDefaults(projectId, value | null) → void` — `null` cancella l'entry
 
 ### State
 
@@ -109,6 +119,7 @@ Agenti: Codex overlay copia `config.toml` e sostituisce solo synara. Claude `set
 - `showEnvironmentLinear`: boolean — default `true` (local AppSettings)
 - `pendingLinearRename`: `LinearIssue | null` — dialog Ask (component ChatView)
 - `rememberedLinearIssueUrls`: `Map<path, url>` — sessione browser (module)
+- `synara:project-linear-defaults:v1`: `Record<projectId, { workspaceId, teamId, projectId | null }>` — localStorage, non sincronizzato tra macchine
 
 ### External Dependencies
 
@@ -133,6 +144,8 @@ API key solo nel secret store (`~/.synara/userdata/secrets/`, 0600). `settings.j
 **Gotcha:** un secondo org visibile nel picker `@` non entra negli agenti finché l'utente non aggiunge `linear-esopo` (o simile) nella _sua_ config MCP. Quack non scrive quel file.
 
 **Gotcha:** la key vecchia `linear-api-key` può far dire “Connected” senza riga in lista. `migrateLegacyLinearApiKey` promuove sempre quella key a un workspace (nome vero se Linear risponde, altrimenti placeholder `Linear`). Un secondo workspace = un’altra key in **Add another workspace** → Save — non sostituisce la prima.
+
+**Gotcha:** l'associazione team/progetto per project (`ProjectSettingsDialog`) vive in localStorage, non in `project.meta.update` / read model server. Non sincronizza tra macchine e non compare in `synara.getSettings`. Se serve condividerla tra dispositivi va spostata nel comando server — è una scelta deliberata per evitare contratto + evento + projection + reducer web per un default UI.
 
 ### Cosa NON fa (per scelta)
 

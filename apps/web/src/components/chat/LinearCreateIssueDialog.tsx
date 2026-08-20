@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { linearCreateOptionsQueryOptions, createLinearIssue } from "~/lib/linearReactQuery";
+import type { ProjectLinearDefaults } from "~/lib/projectLinearDefaults";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -27,6 +28,8 @@ const NO_PROJECT = "none";
 export function LinearCreateIssueDialog(props: {
   /** Null keeps the dialog closed; a string (possibly empty) opens it prefilled. */
   draftTitle: string | null;
+  /** Team/project the active Quack project is associated with, if any. */
+  defaults?: ProjectLinearDefaults | null;
   onClose: () => void;
   onCreated: (issue: LinearIssue) => void;
 }) {
@@ -40,6 +43,7 @@ export function LinearCreateIssueDialog(props: {
         {props.draftTitle !== null ? (
           <LinearCreateIssueForm
             draftTitle={props.draftTitle}
+            defaults={props.defaults ?? null}
             onClose={props.onClose}
             onCreated={props.onCreated}
           />
@@ -51,15 +55,18 @@ export function LinearCreateIssueDialog(props: {
 
 function LinearCreateIssueForm(props: {
   draftTitle: string;
+  defaults: ProjectLinearDefaults | null;
   onClose: () => void;
   onCreated: (issue: LinearIssue) => void;
 }) {
   const optionsQuery = useQuery(linearCreateOptionsQueryOptions(true));
   const workspaces = optionsQuery.data?.workspaces ?? [];
   const [title, setTitle] = useState(props.draftTitle);
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
-  const [teamId, setTeamId] = useState<string | null>(null);
-  const [projectId, setProjectId] = useState(NO_PROJECT);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(
+    props.defaults?.workspaceId ?? null,
+  );
+  const [teamId, setTeamId] = useState<string | null>(props.defaults?.teamId ?? null);
+  const [projectId, setProjectId] = useState(props.defaults?.projectId ?? NO_PROJECT);
   const [isSaving, setIsSaving] = useState(false);
 
   const selectedWorkspaceId = workspaceId ?? workspaces[0]?.workspace.id ?? null;

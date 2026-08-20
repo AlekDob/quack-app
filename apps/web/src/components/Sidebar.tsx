@@ -6801,6 +6801,7 @@ export default function Sidebar() {
 
       <ProjectSettingsDialog
         open={renameProjectDialogId !== null && renameProjectDialogProject !== null}
+        projectId={renameProjectDialogProject?.id ?? ""}
         initialName={
           renameProjectDialogProject?.localName ?? renameProjectDialogProject?.name ?? ""
         }
