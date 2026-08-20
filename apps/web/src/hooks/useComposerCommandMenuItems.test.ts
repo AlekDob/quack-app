@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { ComposerThreadMentionSource, Project } from "../types";
-import { buildThreadMentionComposerItems, linearComposerCreateQuery } from "./useComposerCommandMenuItems";
+import {
+  buildThreadMentionComposerItems,
+  linearComposerCreateQuery,
+} from "./useComposerCommandMenuItems";
 
 function project(id: string, kind: Project["kind"], name: string): Project {
   return {

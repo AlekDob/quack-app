@@ -3,6 +3,17 @@ import { Schema } from "effect";
 import { TrimmedNonEmptyString } from "./baseSchemas";
 
 export const LINEAR_ISSUE_SEARCH_LIMIT = 20;
+export const LINEAR_WORKSPACE_LIMIT = 8;
+export const LINEAR_WORKSPACE_LABEL_MAX = 64;
+
+export const LinearWorkspace = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  name: TrimmedNonEmptyString,
+  urlKey: TrimmedNonEmptyString,
+  // User-chosen name in Settings / @ picker. Empty or absent → Linear org `name`.
+  label: Schema.optional(Schema.String.check(Schema.isMaxLength(LINEAR_WORKSPACE_LABEL_MAX))),
+});
+export type LinearWorkspace = typeof LinearWorkspace.Type;
 
 export const LinearIssue = Schema.Struct({
   id: TrimmedNonEmptyString,
@@ -12,6 +23,9 @@ export const LinearIssue = Schema.Struct({
   url: Schema.String,
   stateName: Schema.String,
   projectName: Schema.NullOr(Schema.String),
+  workspaceId: TrimmedNonEmptyString,
+  workspaceName: TrimmedNonEmptyString,
+  workspaceUrlKey: TrimmedNonEmptyString,
 });
 export type LinearIssue = typeof LinearIssue.Type;
 
@@ -34,13 +48,20 @@ export const LinearProject = Schema.Struct({
 });
 export type LinearProject = typeof LinearProject.Type;
 
-export const LinearCreateOptions = Schema.Struct({
+export const LinearWorkspaceCreateOptions = Schema.Struct({
+  workspace: LinearWorkspace,
   teams: Schema.Array(LinearTeam),
   projects: Schema.Array(LinearProject),
+});
+export type LinearWorkspaceCreateOptions = typeof LinearWorkspaceCreateOptions.Type;
+
+export const LinearCreateOptions = Schema.Struct({
+  workspaces: Schema.Array(LinearWorkspaceCreateOptions),
 });
 export type LinearCreateOptions = typeof LinearCreateOptions.Type;
 
 export const LinearCreateIssueInput = Schema.Struct({
+  workspaceId: TrimmedNonEmptyString,
   title: TrimmedNonEmptyString.check(Schema.isMaxLength(256)),
   teamId: TrimmedNonEmptyString,
   projectId: Schema.optional(TrimmedNonEmptyString),

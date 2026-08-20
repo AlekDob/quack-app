@@ -441,7 +441,7 @@ export const SETTINGS_SEARCH_ENTRIES: readonly SettingsSearchEntry[] = [
     section: "linear",
     title: "API key",
     keywords:
-      "Linear personal API key lin_api secret Security and access connect disconnect ticket",
+      "Linear personal API key lin_api secret Security and access connect disconnect ticket workspace",
   },
   {
     id: "advanced:version",

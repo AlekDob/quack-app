@@ -5,9 +5,11 @@
 import {
   LINEAR_ISSUE_SEARCH_LIMIT,
   type LinearCreateIssueInput,
-  type LinearCreateOptions,
   type LinearIssue,
+  type LinearWorkspace,
+  type LinearWorkspaceCreateOptions,
 } from "@synara/contracts";
+import { linearWorkspaceDisplayName } from "@synara/shared/linearMentions";
 
 import { fetchJson } from "../providerUsage/http";
 
@@ -40,7 +42,7 @@ function text(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-function toIssue(raw: RawIssue): LinearIssue | null {
+function toIssue(raw: RawIssue, workspace: LinearWorkspace): LinearIssue | null {
   const id = text(raw.id);
   const identifier = text(raw.identifier);
   if (!id || !identifier) return null;
@@ -52,6 +54,9 @@ function toIssue(raw: RawIssue): LinearIssue | null {
     url: text(raw.url),
     stateName: text(raw.state?.name),
     projectName: projectName.length > 0 ? projectName : null,
+    workspaceId: workspace.id,
+    workspaceName: linearWorkspaceDisplayName(workspace),
+    workspaceUrlKey: workspace.urlKey,
   };
 }
 
@@ -69,7 +74,7 @@ async function linearGraphql(
     body: { query, variables },
   });
   if (result.status === 401 || result.status === 403) {
-    throw new LinearApiError("Linear rejected the API key. Check it in Settings, Integrations.");
+    throw new LinearApiError("Linear rejected the API key. Check it in Settings, Linear.");
   }
   if (!result.ok) {
     throw new LinearApiError(`Linear request failed with status ${result.status}.`);
@@ -88,6 +93,33 @@ async function linearGraphql(
   return payload.data;
 }
 
+function parseOrganization(raw: unknown): LinearWorkspace | null {
+  const organization = raw as { id?: unknown; name?: unknown; urlKey?: unknown } | null;
+  const id = text(organization?.id);
+  const name = text(organization?.name);
+  const urlKey = text(organization?.urlKey);
+  if (!id || !name || !urlKey) return null;
+  return { id, name, urlKey };
+}
+
+export async function fetchLinearOrganization(apiKey: string): Promise<LinearWorkspace> {
+  const data = await linearGraphql(
+    apiKey,
+    `query {
+      organization { id name urlKey }
+      viewer { organization { id name urlKey } }
+    }`,
+    {},
+  );
+  const workspace =
+    parseOrganization(data.organization) ??
+    parseOrganization((data.viewer as { organization?: unknown } | null)?.organization);
+  if (!workspace) {
+    throw new LinearApiError("Linear did not return a workspace for that API key.");
+  }
+  return workspace;
+}
+
 /**
  * Open issues, newest activity first. With a search term we go through Linear's own
  * search so typing a ticket code ("ale-28") matches as well as words from the title.
@@ -95,6 +127,7 @@ async function linearGraphql(
 export async function searchLinearIssues(
   apiKey: string,
   term: string,
+  workspace: LinearWorkspace,
 ): Promise<ReadonlyArray<LinearIssue>> {
   const trimmed = term.trim();
   const data = trimmed
@@ -116,13 +149,44 @@ export async function searchLinearIssues(
     nodes?: ReadonlyArray<RawIssue>;
   } | null;
   return (connection?.nodes ?? []).flatMap((node) => {
-    const issue = toIssue(node);
+    const issue = toIssue(node, workspace);
     return issue ? [issue] : [];
   });
 }
 
+export type LinearWorkspaceKey = {
+  readonly workspace: LinearWorkspace;
+  readonly apiKey: string;
+};
+
+export async function searchLinearIssuesAcrossWorkspaces(
+  workspaces: ReadonlyArray<LinearWorkspaceKey>,
+  term: string,
+): Promise<ReadonlyArray<LinearIssue>> {
+  const results = await Promise.allSettled(
+    workspaces.map((entry) => searchLinearIssues(entry.apiKey, term, entry.workspace)),
+  );
+  const issues: LinearIssue[] = [];
+  const failures: unknown[] = [];
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      issues.push(...result.value);
+    } else {
+      failures.push(result.reason);
+    }
+  }
+  if (issues.length === 0 && failures.length > 0 && workspaces.length > 0) {
+    const first = failures[0];
+    throw first instanceof Error ? first : new LinearApiError("Linear search failed.");
+  }
+  return issues;
+}
+
 /** Teams and projects the key can write to, for the "new issue" form. */
-export async function listLinearCreateOptions(apiKey: string): Promise<LinearCreateOptions> {
+export async function listLinearCreateOptions(
+  apiKey: string,
+  workspace: LinearWorkspace,
+): Promise<LinearWorkspaceCreateOptions> {
   const data = await linearGraphql(
     apiKey,
     `query {
@@ -135,6 +199,7 @@ export async function listLinearCreateOptions(apiKey: string): Promise<LinearCre
   const projects = (data.projects as { nodes?: ReadonlyArray<Record<string, unknown>> } | null)
     ?.nodes;
   return {
+    workspace,
     teams: (teams ?? []).map((team) => ({
       id: text(team.id),
       key: text(team.key),
@@ -150,8 +215,18 @@ export async function listLinearCreateOptions(apiKey: string): Promise<LinearCre
   };
 }
 
+export async function listLinearCreateOptionsAcrossWorkspaces(
+  workspaces: ReadonlyArray<LinearWorkspaceKey>,
+): Promise<{ workspaces: LinearWorkspaceCreateOptions[] }> {
+  const results = await Promise.all(
+    workspaces.map((entry) => listLinearCreateOptions(entry.apiKey, entry.workspace)),
+  );
+  return { workspaces: results };
+}
+
 export async function createLinearIssue(
   apiKey: string,
+  workspace: LinearWorkspace,
   input: LinearCreateIssueInput,
 ): Promise<LinearIssue> {
   const data = await linearGraphql(
@@ -168,7 +243,7 @@ export async function createLinearIssue(
     },
   );
   const payload = data.issueCreate as { success?: unknown; issue?: RawIssue | null } | null;
-  const issue = payload?.issue ? toIssue(payload.issue) : null;
+  const issue = payload?.issue ? toIssue(payload.issue, workspace) : null;
   if (!payload?.success || !issue) {
     throw new LinearApiError("Linear did not create the issue.");
   }

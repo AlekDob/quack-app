@@ -21,7 +21,10 @@ import {
   MAC_DEVICE_HELPER_RESOURCE_PATH,
   validateDesktopNativeBuildHost,
 } from "./lib/desktop-platform-build-config.ts";
-import { SYNARA_PRODUCTION_BUNDLE_ID } from "@synara/shared/desktopIdentity";
+import {
+  SYNARA_DESKTOP_UPDATE_CHANNEL,
+  SYNARA_PRODUCTION_BUNDLE_ID,
+} from "@synara/shared/desktopIdentity";
 import { parseBooleanEnvValue } from "./lib/env-bool.ts";
 import { finalizeSignedMacDmg } from "./lib/mac-dmg-finalize.ts";
 import { finalizeMacUpdateZip } from "./lib/mac-update-zip-finalize.ts";
@@ -539,6 +542,7 @@ function resolveGitHubPublishConfig():
       readonly owner: string;
       readonly repo: string;
       readonly releaseType: "release";
+      readonly channel: typeof SYNARA_DESKTOP_UPDATE_CHANNEL;
     }
   | undefined {
   const rawRepo =
@@ -555,6 +559,10 @@ function resolveGitHubPublishConfig():
     owner,
     repo,
     releaseType: "release",
+    // electron-updater asks the feed for `${channel}-mac.yml`. Without this the
+    // build emits latest-mac.yml while the app requests synara-mac.yml, so every
+    // update check 404s silently.
+    channel: SYNARA_DESKTOP_UPDATE_CHANNEL,
   };
 }
 

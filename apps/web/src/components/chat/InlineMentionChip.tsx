@@ -56,11 +56,10 @@ export function InlineMentionChip(props: InlineMentionChipProps) {
     props.path,
     props.mentionReferences,
   );
-  const linearIdentifier =
-    identifierFromLinearMentionPath(props.path) ??
-    (linearMention ? identifierFromLinearMentionPath(linearMention.path) : null);
-  const linearHref =
-    props.href ?? (linearIdentifier ? resolveLinearIssueUrl(linearIdentifier) : undefined);
+  const linearPath =
+    linearMention?.path ?? (identifierFromLinearMentionPath(props.path) ? props.path : null);
+  const linearIdentifier = linearPath ? identifierFromLinearMentionPath(linearPath) : null;
+  const linearHref = props.href ?? (linearPath ? resolveLinearIssueUrl(linearPath) : undefined);
   const label =
     props.label ??
     (resolvedKind === "linear"

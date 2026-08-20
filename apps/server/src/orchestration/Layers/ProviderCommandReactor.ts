@@ -1348,6 +1348,7 @@ const make = Effect.gen(function* () {
         providerThread.modelSelection.provider) as ProviderKind;
       const steerPaperoInlineText = buildInlinePaperoInstructions({
         paperoId: input.paperoId,
+        messageText: input.messageText,
         ...(teamAgent ? { agent: teamAgent } : {}),
         maxChars: Math.max(
           0,
@@ -1546,6 +1547,7 @@ const make = Effect.gen(function* () {
     const providerInputWithMentionContext = `${providerInput}${mentionContextSuffix}`;
     const paperoInlineText = buildInlinePaperoInstructions({
       paperoId: input.paperoId,
+      messageText: input.messageText,
       ...(teamAgent ? { agent: teamAgent } : {}),
       maxChars: Math.max(
         0,

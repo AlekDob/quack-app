@@ -180,6 +180,16 @@ const AVAILABLE_NOW_DEFINITIONS: readonly ShortcutDefinition[] = [
         : "Choose this reasoning level for the selected model, ordered from lowest to highest.",
   })),
   {
+    command: "composer.effort.next",
+    label: "Next reasoning level",
+    description: "Step up one reasoning level, wrapping back to the lowest at the top.",
+  },
+  {
+    command: "composer.effort.previous",
+    label: "Previous reasoning level",
+    description: "Step down one reasoning level, wrapping back to the highest at the bottom.",
+  },
+  {
     command: "composer.focus.toggle",
     label: "Focus composer",
     description: "Focus or blur the chat prompt composer.",

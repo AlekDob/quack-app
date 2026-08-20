@@ -17,6 +17,7 @@ import {
 } from "./EnvironmentRow";
 
 export type LinearEnvironmentItem = {
+  path: string;
   identifier: string;
   title: string;
   url: string;
@@ -29,8 +30,8 @@ export function collectLinearEnvironmentItems(
   const seen = new Set<string>();
   for (const mention of mentions) {
     const identifier = identifierFromLinearMentionPath(mention.path);
-    if (!identifier || seen.has(identifier)) continue;
-    seen.add(identifier);
+    if (!identifier || seen.has(mention.path)) continue;
+    seen.add(mention.path);
     const prefix = `${identifier} `;
     const title = mention.name.startsWith(prefix)
       ? mention.name.slice(prefix.length)
@@ -38,9 +39,10 @@ export function collectLinearEnvironmentItems(
         ? ""
         : mention.name;
     items.push({
+      path: mention.path,
       identifier,
       title,
-      url: resolveLinearIssueUrl(identifier),
+      url: resolveLinearIssueUrl(mention.path),
     });
   }
   return items;
@@ -62,7 +64,7 @@ export function EnvironmentLinearSection({
     <EnvironmentLabeledSection label="Linear">
       {items.map((item) => (
         <EnvironmentRow
-          key={item.identifier}
+          key={item.path}
           icon={<CentralIcon name="linear" className={ENVIRONMENT_ROW_ICON_CLASS_NAME} />}
           label={
             <span className="truncate">

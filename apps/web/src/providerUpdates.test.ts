@@ -78,7 +78,7 @@ function serverSettings(overrides: Partial<ServerSettings["providers"]> = {}): S
       ...overrides,
     },
     skills: { disabled: [] },
-    linear: { apiKeyConfigured: false },
+    linear: { apiKeyConfigured: false, workspaces: [] },
   };
 }
 

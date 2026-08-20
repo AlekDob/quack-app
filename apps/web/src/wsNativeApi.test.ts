@@ -334,7 +334,7 @@ describe("wsNativeApi", () => {
           },
         },
         skills: { disabled: [] },
-        linear: { apiKeyConfigured: false },
+        linear: { apiKeyConfigured: false, workspaces: [] },
       },
     } as const;
     emitPush(WS_CHANNELS.serverSettingsUpdated, payload);

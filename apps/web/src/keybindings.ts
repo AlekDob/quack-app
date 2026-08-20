@@ -185,6 +185,18 @@ export const DEFAULT_SHORTCUT_FALLBACKS: ResolvedKeybindingsConfig = [
     shortcut: commandShortcut(String(index + 1), { ctrlKey: true, modKey: false }),
     whenAst: whenThreadJumpAvailable,
   })),
+  // Single-chord effort cycling, so a hardware dial (XP-Pen wheel, Loupedeck)
+  // can map one shortcut per rotation direction. Ctrl+1..9 stay for direct picks.
+  {
+    command: "composer.effort.next",
+    shortcut: commandShortcut("=", { altKey: true, modKey: false }),
+    whenAst: whenNotTerminalFocus,
+  },
+  {
+    command: "composer.effort.previous",
+    shortcut: commandShortcut("-", { altKey: true, modKey: false }),
+    whenAst: whenNotTerminalFocus,
+  },
   // Cmd-only instead of mod so Ctrl+L remains available to shells on non-macOS.
   {
     command: "composer.focus.toggle",

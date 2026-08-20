@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import { TrimmedString } from "./baseSchemas";
+import { LINEAR_WORKSPACE_LABEL_MAX, LinearWorkspace } from "./linear";
 import { DEFAULT_GIT_TEXT_GENERATION_MODEL } from "./model";
 import { ModelSelection, ProviderKind, ThreadEnvironmentMode } from "./orchestration";
 
@@ -97,10 +98,11 @@ export const SkillsServerSettings = Schema.Struct({
 });
 export type SkillsServerSettings = typeof SkillsServerSettings.Type;
 
-// Linear integration. The API key itself lives in the server secret store, so
-// only a "is it set" flag crosses the settings boundary.
+// Linear integration. API keys live in the secret store. Public workspace
+// metadata (name, urlKey) is safe to persist in settings.json.
 export const LinearServerSettings = Schema.Struct({
   apiKeyConfigured: Schema.Boolean.pipe(Schema.withDecodingDefault(() => false)),
+  workspaces: Schema.Array(LinearWorkspace).pipe(Schema.withDecodingDefault(() => [])),
 });
 export type LinearServerSettings = typeof LinearServerSettings.Type;
 
@@ -222,6 +224,16 @@ export const ServerSettingsPatch = Schema.Struct({
   linear: Schema.optionalKey(
     Schema.Struct({
       apiKey: Schema.optionalKey(StringSetting),
+      label: Schema.optionalKey(
+        Schema.String.check(Schema.isMaxLength(LINEAR_WORKSPACE_LABEL_MAX)),
+      ),
+      removeWorkspaceId: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(256))),
+      renameWorkspace: Schema.optionalKey(
+        Schema.Struct({
+          id: Schema.String.check(Schema.isMaxLength(256)),
+          label: Schema.String.check(Schema.isMaxLength(LINEAR_WORKSPACE_LABEL_MAX)),
+        }),
+      ),
     }),
   ),
 });

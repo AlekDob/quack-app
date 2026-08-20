@@ -36,7 +36,14 @@ import { writeFileStringAtomically } from "./atomicWrite";
 import { ServerSecretStoreLive } from "./auth/Layers/ServerSecretStore";
 import { ServerSecretStore } from "./auth/Services/ServerSecretStore";
 import { ServerConfig } from "./config";
-import { isLinearApiKeyConfigured, writeLinearApiKey } from "./linear/linearCredentials";
+import { isLinearApiKeyConfigured } from "./linear/linearCredentials";
+import {
+  addLinearWorkspace,
+  linearSettingsView,
+  migrateLegacyLinearApiKey,
+  removeLinearWorkspace,
+  renameLinearWorkspace,
+} from "./linear/linearWorkspaces";
 import {
   ProviderCredentials,
   ProviderCredentialsLive,
@@ -270,7 +277,10 @@ const makeServerSettings = Effect.gen(function* () {
       Effect.map(
         (configured): ServerSettings => ({
           ...settings,
-          linear: { apiKeyConfigured: configured.linear },
+          linear: {
+            ...linearSettingsView(settings.linear.workspaces),
+            apiKeyConfigured: settings.linear.workspaces.length > 0 || configured.linear,
+          },
           providers: {
             ...settings.providers,
             kilo: {
@@ -353,11 +363,29 @@ const makeServerSettings = Effect.gen(function* () {
           }),
       ),
     );
+    const migratedWorkspaces = yield* migrateLegacyLinearApiKey(
+      secrets,
+      decoded.value.linear.workspaces,
+    ).pipe(
+      Effect.mapError(
+        (cause) =>
+          new ServerSettingsError({
+            settingsPath,
+            detail: "failed to migrate Linear API key",
+            cause,
+          }),
+      ),
+    );
+    const linearMigrated = migratedWorkspaces.length !== decoded.value.linear.workspaces.length;
     return {
-      settings: yield* withCredentialState(decoded.value),
+      settings: yield* withCredentialState({
+        ...decoded.value,
+        linear: linearSettingsView(migratedWorkspaces),
+      }),
       revision: decoded.revision,
       migrated:
         legacyPasswords.size > 0 ||
+        linearMigrated ||
         decoded.legacyFormat ||
         decoded.migrationVersion !== SERVER_SETTINGS_MIGRATION_VERSION,
     };
@@ -439,19 +467,66 @@ const makeServerSettings = Effect.gen(function* () {
             );
           }
         }
-        if (patch.linear?.apiKey !== undefined) {
-          yield* writeLinearApiKey(secrets, patch.linear.apiKey).pipe(
+        let linearWorkspaces = current.linear.workspaces;
+        if (patch.linear?.apiKey) {
+          linearWorkspaces = yield* addLinearWorkspace(
+            secrets,
+            linearWorkspaces,
+            patch.linear.apiKey,
+            patch.linear.label,
+          ).pipe(
             Effect.mapError(
               (cause) =>
                 new ServerSettingsError({
                   settingsPath,
-                  detail: "failed to update Linear API key",
+                  detail: cause instanceof Error ? cause.message : "failed to add Linear workspace",
                   cause,
                 }),
             ),
           );
         }
-        const normalized = yield* normalizeSettings(settingsPath, current, omitSecrets(patch));
+        if (patch.linear?.renameWorkspace) {
+          linearWorkspaces = yield* migrateLegacyLinearApiKey(secrets, linearWorkspaces).pipe(
+            Effect.mapError(
+              (cause) =>
+                new ServerSettingsError({
+                  settingsPath,
+                  detail: "failed to migrate Linear API key",
+                  cause,
+                }),
+            ),
+          );
+          linearWorkspaces = renameLinearWorkspace(
+            linearWorkspaces,
+            patch.linear.renameWorkspace.id,
+            patch.linear.renameWorkspace.label,
+          );
+        }
+        if (patch.linear?.removeWorkspaceId) {
+          linearWorkspaces = yield* removeLinearWorkspace(
+            secrets,
+            linearWorkspaces,
+            patch.linear.removeWorkspaceId,
+          ).pipe(
+            Effect.mapError(
+              (cause) =>
+                new ServerSettingsError({
+                  settingsPath,
+                  detail: "failed to remove Linear workspace",
+                  cause,
+                }),
+            ),
+          );
+        }
+        const currentWithLinear = {
+          ...current,
+          linear: linearSettingsView(linearWorkspaces),
+        };
+        const normalized = yield* normalizeSettings(
+          settingsPath,
+          currentWithLinear,
+          omitSecrets(patch),
+        );
         const next = yield* withCredentialState(normalized);
         const nextRevision = Math.max(disk.revision, yield* Ref.get(revisionRef)) + 1;
         yield* writeSettingsAtomically({

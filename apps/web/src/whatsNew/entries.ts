@@ -22,6 +22,64 @@ import type { WhatsNewEntry } from "./logic";
 
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
   {
+    version: "2.0.1",
+    date: "Aug 20",
+    features: [
+      {
+        id: "linear-multiple-workspaces",
+        title: "Connect more than one Linear workspace",
+        description:
+          "Add several Linear workspaces, label them, and pick the right one when you create or mention an issue.",
+        details:
+          "Linear settings now hold a list of workspaces instead of a single API key. Each workspace keeps its own key in the secret store, and the old single-key setup is migrated on first read so nothing needs re-entering.",
+      },
+      {
+        id: "keep-user-mcp-servers",
+        title: "Your own MCP servers stay connected",
+        description:
+          "Cursor, Grok, and Droid sessions now keep the MCP servers you configured yourself, alongside Quack's.",
+        details:
+          "Those providers only receive the MCP list Quack hands them at session start, so passing Quack's own entry alone silently dropped everything else — including an official Linear MCP. Quack now reads each provider's native mcp.json (read-only) and merges it, never renaming or replacing your entries.",
+      },
+      {
+        id: "effort-wheel-shortcuts",
+        title: "Cycle reasoning level with one shortcut",
+        description:
+          "Two new shortcuts step the reasoning level up and down, so a hardware dial can drive it.",
+        details:
+          "Alt+= and Alt+- move one level and wrap around at the ends. The existing Ctrl+1..9 direct picks still work; they just can't be mapped to a wheel, which only sends one shortcut per direction. Both are rebindable in Settings → Keyboard shortcuts.",
+      },
+      {
+        id: "stop-button-instant",
+        title: "The stop button reacts right away",
+        description:
+          "Clicking stop now registers immediately instead of waiting for the turn to notice.",
+        details:
+          "The control acknowledges the click locally and then sends the interrupt, so a busy turn no longer makes the button look dead.",
+      },
+      {
+        id: "agent-identity-in-turn",
+        title: "Agents keep their voice more reliably",
+        description:
+          "The selected agent's identity and house style are attached to each turn, not just the opening message.",
+        details:
+          "Identity instructions are injected into the provider turn input rather than only the persisted first bubble, so long conversations and slash-command turns no longer drift back to a generic voice.",
+      },
+      {
+        id: "cursor-session-recovery",
+        title: "Cursor recovers from a broken session",
+        description:
+          "If reopening a Cursor session fails, Quack starts a fresh one instead of stalling.",
+      },
+      {
+        id: "smaller-prompt-images",
+        title: "Faster image prompts",
+        description:
+          "Images pasted into the composer are downscaled before they're sent, so large screenshots no longer slow a turn down.",
+      },
+    ],
+  },
+  {
     version: "2.0.0",
     date: "Aug 5",
     features: [

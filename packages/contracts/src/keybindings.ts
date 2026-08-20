@@ -59,6 +59,8 @@ const STATIC_KEYBINDING_COMMANDS = [
   "papero.next",
   "traitsPicker.toggle",
   ...COMPOSER_EFFORT_KEYBINDING_COMMANDS,
+  "composer.effort.next",
+  "composer.effort.previous",
   "settings.usage",
   "chat.new",
   "chat.newLatestProject",

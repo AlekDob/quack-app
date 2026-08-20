@@ -378,7 +378,7 @@ export function useComposerCommandMenuItems(input: {
       type: "linear-issue" as const,
       issue,
       label: `${issue.identifier} ${issue.title}`,
-      description: issue.projectName ?? "",
+      description: issue.projectName ?? issue.workspaceName,
     }));
     const linearItems: ComposerCommandItem[] = linearConnected
       ? createQuery !== null

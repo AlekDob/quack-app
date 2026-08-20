@@ -39,7 +39,8 @@ import {
 import { ChildProcessSpawner } from "effect/unstable/process";
 import type * as Acp from "@agentclientprotocol/sdk";
 
-import { buildAcpSynaraMcpServers } from "../../agentGateway/mcpInjection.ts";
+import { buildAcpSessionMcpServers } from "../../agentGateway/mcpInjection.ts";
+import { loadUserAcpMcpServers } from "../userMcpConfig.ts";
 import {
   type SynaraHarnessPolicyDeliveryState,
   takeSynaraHarnessPolicyTextPartForProviderSession,
@@ -866,10 +867,11 @@ export function makeDroidAdapter(
             ...(agentGatewayCredentials
               ? {
                   buildMcpServers: (initializeResult: Acp.InitializeResponse) =>
-                    buildAcpSynaraMcpServers({
+                    buildAcpSessionMcpServers({
                       connection: gatewaySessionLease!.connection,
                       initializeResult,
                       stdioProxy: agentGatewayCredentials.stdioProxy,
+                      userServers: loadUserAcpMcpServers({ provider: "droid", cwd }),
                     }),
                 }
               : {}),

@@ -1,8 +1,9 @@
 // FILE: LinearCreateIssueDialog.tsx
-// Purpose: Create a Linear issue from the composer `@` menu (title, team, optional project).
+// Purpose: Create a Linear issue from the composer `@` menu (workspace, title, team, optional project).
 // Layer: Chat UI components
 
 import type { LinearIssue } from "@synara/contracts";
+import { linearWorkspaceDisplayName } from "@synara/shared/linearMentions";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -36,8 +37,6 @@ export function LinearCreateIssueDialog(props: {
           <DialogTitle>New Linear issue</DialogTitle>
           <DialogDescription>Creates a Linear issue and inserts it in this chat.</DialogDescription>
         </DialogHeader>
-        {/* Form state lives below DialogPopup, which unmounts on close, so each
-            open starts from a fresh draft without a reset effect. */}
         {props.draftTitle !== null ? (
           <LinearCreateIssueForm
             draftTitle={props.draftTitle}
@@ -56,23 +55,29 @@ function LinearCreateIssueForm(props: {
   onCreated: (issue: LinearIssue) => void;
 }) {
   const optionsQuery = useQuery(linearCreateOptionsQueryOptions(true));
-  const teams = optionsQuery.data?.teams ?? [];
+  const workspaces = optionsQuery.data?.workspaces ?? [];
   const [title, setTitle] = useState(props.draftTitle);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [projectId, setProjectId] = useState(NO_PROJECT);
   const [isSaving, setIsSaving] = useState(false);
 
+  const selectedWorkspaceId = workspaceId ?? workspaces[0]?.workspace.id ?? null;
+  const selectedWorkspace = workspaces.find((entry) => entry.workspace.id === selectedWorkspaceId);
+  const teams = selectedWorkspace?.teams ?? [];
   const selectedTeamId = teamId ?? teams[0]?.id ?? null;
-  const projects = (optionsQuery.data?.projects ?? []).filter(
+  const projects = (selectedWorkspace?.projects ?? []).filter(
     (project) => selectedTeamId !== null && project.teamIds.includes(selectedTeamId),
   );
-  const canSave = title.trim().length > 0 && selectedTeamId !== null && !isSaving;
+  const canSave =
+    title.trim().length > 0 && selectedWorkspaceId !== null && selectedTeamId !== null && !isSaving;
 
   const handleSubmit = async () => {
-    if (!canSave || selectedTeamId === null) return;
+    if (!canSave || selectedWorkspaceId === null || selectedTeamId === null) return;
     setIsSaving(true);
     try {
       const issue = await createLinearIssue({
+        workspaceId: selectedWorkspaceId,
         title: title.trim(),
         teamId: selectedTeamId,
         ...(projectId === NO_PROJECT ? {} : { projectId }),
@@ -107,6 +112,33 @@ function LinearCreateIssueForm(props: {
             disabled={isSaving}
             onChange={(event) => setTitle(event.target.value)}
           />
+          {workspaces.length > 1 ? (
+            <Select
+              value={selectedWorkspaceId ?? ""}
+              onValueChange={(value) => {
+                setWorkspaceId(value);
+                setTeamId(null);
+                setProjectId(NO_PROJECT);
+              }}
+            >
+              <SelectTrigger size="sm" className="w-full" aria-label="Linear workspace">
+                <SelectValue>
+                  {selectedWorkspace
+                    ? linearWorkspaceDisplayName(selectedWorkspace.workspace)
+                    : optionsQuery.isLoading
+                      ? "Loading workspaces..."
+                      : "Select a workspace"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPopup surface="settings">
+                {workspaces.map((entry) => (
+                  <SelectItem key={entry.workspace.id} value={entry.workspace.id}>
+                    {linearWorkspaceDisplayName(entry.workspace)}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
+          ) : null}
           <Select
             value={selectedTeamId ?? ""}
             onValueChange={(value) => {

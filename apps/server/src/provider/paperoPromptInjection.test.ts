@@ -38,3 +38,27 @@ describe("buildInlinePaperoInstructions", () => {
     assert.match(text, /\[truncated\]/);
   });
 });
+
+describe("provider slash command turns", () => {
+  it("skips the identity block so the slash stays at position 0", () => {
+    // Regression: with a duck selected, "/compact" was sent as
+    // "[Agent identity]...\n\n/compact" and the provider never ran the command.
+    for (const text of ["/compact", "  /compact  ", "/compact focus on the bug", "/clear"]) {
+      assert.equal(
+        buildInlinePaperoInstructions({ paperoId: "builder", messageText: text, maxChars: 20_000 }),
+        "",
+        text,
+      );
+    }
+  });
+
+  it("still injects for ordinary prompts", () => {
+    for (const text of ["fix the bug", "/compact\nand also explain", "// comment", "/ spaced"]) {
+      assert.match(
+        buildInlinePaperoInstructions({ paperoId: "builder", messageText: text, maxChars: 20_000 }),
+        /\[Agent identity\]/,
+        text,
+      );
+    }
+  });
+});

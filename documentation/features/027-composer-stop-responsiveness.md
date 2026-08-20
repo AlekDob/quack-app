@@ -24,13 +24,14 @@ Because the button's only state source was `phase === "running"`, clicking it pr
 
 ### Files
 
-| Type      | Path                                    | Exports/Purpose                                                        |
-| --------- | ---------------------------------------- | ------------------------------------------------------------------------ |
-| Component | `apps/web/src/components/ChatView.tsx`   | `isStopPending` local state; `onInterruptFromStopControl`; stop button  |
+| Type      | Path                                   | Exports/Purpose                                                        |
+| --------- | -------------------------------------- | ---------------------------------------------------------------------- |
+| Component | `apps/web/src/components/ChatView.tsx` | `isStopPending` local state; `onInterruptFromStopControl`; stop button |
 
 ### Data flow
 
 Click → `onInterruptFromStopControl` sets `stopRequestedKey` to `stopControlKey` (`` `${threadId}:${turnId}` ``) synchronously, before awaiting the dispatch → button re-renders with `isStopPending = true` (pulsing icon, `aria-busy`, "Stopping..." title) → `onInterrupt()` dispatches `thread.turn.interrupt` as before (server/reducer behavior unchanged) → resolution:
+
 - **Dispatch throws** → `stopRequestedKey` cleared immediately, existing error toast fires, button returns to normal (retryable).
 - **Provider settles the turn** → `phase` leaves `"running"`, a `useEffect` clears `stopRequestedKey`.
 - **New turn starts on the same thread, or thread switches** → `activeLatestTurnId`/`activeThreadId` changes `stopControlKey`, so the stale pending flag no longer matches and `isStopPending` is `false` for the new turn without any extra cleanup code.

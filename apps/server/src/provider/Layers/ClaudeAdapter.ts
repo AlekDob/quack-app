@@ -5010,6 +5010,9 @@ function makeClaudeAdapter(options?: ClaudeAdapterLiveOptions) {
           env: claudeSdkEnv,
           spawnClaudeCodeProcess: bindClaudeProcessOwner(processOwner),
           ...(input.cwd ? { additionalDirectories: [input.cwd] } : {}),
+          // Only `synara` is injected here. Claude still loads the user's
+          // Linear MCP through settingSources (user/project/local). Do not
+          // replace or rewrite a server named `linear`.
           ...(agentGatewayCredentials
             ? {
                 mcpServers: buildClaudeMcpServers(gatewaySessionLease!.connection),

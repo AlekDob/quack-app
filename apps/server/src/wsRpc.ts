@@ -104,10 +104,11 @@ import { ServerEnvironment } from "./environment/Services/ServerEnvironment";
 import { ExternalMcpService } from "./externalMcp/Services/ExternalMcpService";
 import {
   createLinearIssue,
-  listLinearCreateOptions,
-  searchLinearIssues,
+  listLinearCreateOptionsAcrossWorkspaces,
+  searchLinearIssuesAcrossWorkspaces,
 } from "./linear/linearClient";
-import { readLinearApiKey } from "./linear/linearCredentials";
+import { requireLinearWorkspaceKeys } from "./linear/linearWorkspaces";
+import type { LinearWorkspaceKey } from "./linear/linearClient";
 import { ServerLifecycleEvents } from "./serverLifecycleEvents";
 import { ServerRuntimeStartup } from "./serverRuntimeStartup";
 import { ServerSettingsService } from "./serverSettings";
@@ -791,14 +792,17 @@ const makeWsRpcHandlersLayer = () =>
       const rpcEffect = <A, E, R>(effect: Effect.Effect<A, E, R>, fallbackMessage: string) =>
         effect.pipe(Effect.mapError((cause) => toWsRpcError(cause, fallbackMessage)));
 
-      // Every Linear call needs the stored personal API key; without one the UI should say
-      // "connect Linear" rather than surface an opaque HTTP failure.
-      const withLinearApiKey = <A>(run: (apiKey: string) => Promise<A>) =>
-        readLinearApiKey(secretStore).pipe(
-          Effect.flatMap((apiKey) =>
-            apiKey
-              ? Effect.tryPromise({ try: () => run(apiKey), catch: (cause) => cause })
-              : Effect.fail(new Error("Connect Linear in Settings, Integrations first.")),
+      // Composer Linear calls fan out across every saved workspace key. The
+      // official Linear MCP used by agents is separate and is never rewritten here.
+      const withLinearWorkspaces = <A>(
+        run: (keys: ReadonlyArray<LinearWorkspaceKey>) => Promise<A>,
+      ) =>
+        serverSettings.getSettings.pipe(
+          Effect.flatMap((settings) =>
+            requireLinearWorkspaceKeys(secretStore, settings.linear.workspaces),
+          ),
+          Effect.flatMap((keys) =>
+            Effect.tryPromise({ try: () => run(keys), catch: (cause) => cause }),
           ),
         );
 
@@ -1607,17 +1611,25 @@ const makeWsRpcHandlersLayer = () =>
           ),
         [WS_METHODS.linearSearchIssues]: (input) =>
           rpcEffect(
-            withLinearApiKey((apiKey) => searchLinearIssues(apiKey, input.query ?? "")),
+            withLinearWorkspaces((keys) =>
+              searchLinearIssuesAcrossWorkspaces(keys, input.query ?? ""),
+            ),
             "Failed to search Linear issues",
           ),
         [WS_METHODS.linearListCreateOptions]: () =>
           rpcEffect(
-            withLinearApiKey((apiKey) => listLinearCreateOptions(apiKey)),
+            withLinearWorkspaces((keys) => listLinearCreateOptionsAcrossWorkspaces(keys)),
             "Failed to load Linear teams and projects",
           ),
         [WS_METHODS.linearCreateIssue]: (input) =>
           rpcEffect(
-            withLinearApiKey((apiKey) => createLinearIssue(apiKey, input)),
+            withLinearWorkspaces((keys) => {
+              const entry = keys.find((item) => item.workspace.id === input.workspaceId);
+              if (!entry) {
+                return Promise.reject(new Error("Choose a Linear workspace in Settings first."));
+              }
+              return createLinearIssue(entry.apiKey, entry.workspace, input);
+            }),
             "Failed to create the Linear issue",
           ),
         [WS_METHODS.serverListWorktrees]: () =>

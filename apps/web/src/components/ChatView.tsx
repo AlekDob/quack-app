@@ -6142,6 +6142,23 @@ export default function ChatView({
         return;
       }
 
+      if (command === "composer.effort.next" || command === "composer.effort.previous") {
+        if (!composerPickerShortcutActive) return;
+        const levels = composerTraitSelection.effortLevels;
+        if (levels.length === 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const currentIndex = levels.findIndex(
+          (level) => level.value === composerTraitSelection.effort,
+        );
+        const step = command === "composer.effort.next" ? 1 : -1;
+        // Wrap around: a dial has no ends, so clamping would feel stuck.
+        const nextIndex = (currentIndex + step + levels.length) % levels.length;
+        const nextLevel = levels[nextIndex];
+        if (nextLevel) selectComposerEffort(nextLevel.value);
+        return;
+      }
+
       const effortShortcutIndex = COMPOSER_EFFORT_KEYBINDING_COMMANDS.indexOf(
         command as (typeof COMPOSER_EFFORT_KEYBINDING_COMMANDS)[number],
       );
@@ -10059,11 +10076,11 @@ export default function ChatView({
   );
   const addLinearIssueMention = useCallback(
     (issue: LinearIssue) => {
-      rememberLinearIssueUrl(issue.identifier, issue.url);
       const mention = {
         name: linearMentionNameFromIssue(issue),
-        path: linearMentionPathForIdentifier(issue.identifier),
+        path: linearMentionPathForIdentifier(issue.identifier, issue.workspaceUrlKey),
       } satisfies ProviderMentionReference;
+      rememberLinearIssueUrl(mention.path, issue.url);
       updateSelectedComposerMentions((existing) => {
         const nextWithoutSamePath = existing.filter((item) => item.path !== mention.path);
         return [...nextWithoutSamePath, mention];
@@ -10179,11 +10196,11 @@ export default function ChatView({
         return;
       }
       if (item.type === "linear-issue") {
-        rememberLinearIssueUrl(item.issue.identifier, item.issue.url);
         const mention = {
           name: linearMentionNameFromIssue(item.issue),
-          path: linearMentionPathForIdentifier(item.issue.identifier),
+          path: linearMentionPathForIdentifier(item.issue.identifier, item.issue.workspaceUrlKey),
         } satisfies ProviderMentionReference;
+        rememberLinearIssueUrl(mention.path, item.issue.url);
         applyComposerTriggerReplacement({
           snapshot,
           trigger,
@@ -11818,7 +11835,10 @@ export default function ChatView({
         draftTitle={linearCreateDraftTitle}
         onClose={() => setLinearCreateDraftTitle(null)}
         onCreated={(issue) => {
-          appendComposerPromptText(threadId, formatComposerMentionToken(linearMentionNameFromIssue(issue)));
+          appendComposerPromptText(
+            threadId,
+            formatComposerMentionToken(linearMentionNameFromIssue(issue)),
+          );
           addLinearIssueMention(issue);
           maybeRenameThreadForLinearIssue(issue);
         }}

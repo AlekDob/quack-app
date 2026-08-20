@@ -83,6 +83,10 @@ function shouldKeepBuiltInSlashCommandDespiteNativeCollision(
 ): boolean {
   return (
     command === "automation" ||
+    // The app-owned /compact is an RPC (ProviderService.compactThread) with
+    // per-provider locking; the native text command is the fragile path. Keep
+    // ours even when the provider advertises its own.
+    command === "compact" ||
     command === "export" ||
     command === "feedback" ||
     (providerUsesAppOwnedReviewSlashCommand(provider) && command === "review")
@@ -98,6 +102,9 @@ export function shouldHideProviderNativeCommandFromComposerMenu(
   const appCommandIsAvailable = options.availableAppCommands?.has(normalizedCommand) ?? true;
   return (
     normalizedCommand === "automation" ||
+    // Only when ours is offered — Claude has no app-owned compact and must keep
+    // its native one.
+    (normalizedCommand === "compact" && appCommandIsAvailable) ||
     (normalizedCommand === "export" && appCommandIsAvailable) ||
     (normalizedCommand === "feedback" && appCommandIsAvailable) ||
     (providerUsesAppOwnedReviewSlashCommand(provider) && normalizedCommand === "review")

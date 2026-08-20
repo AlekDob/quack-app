@@ -268,6 +268,26 @@ type ComposerCommandGroupModel = {
 const COMPOSER_COMMAND_GROUP_LABEL_CLASSNAME =
   "px-2 pt-1.5 pb-1 text-[11px] font-normal text-muted-foreground/60";
 
+function groupLinearIssueItems(
+  items: Array<Extract<ComposerCommandItem, { type: "linear-issue" }>>,
+): ComposerCommandGroupModel[] {
+  const groups = new Map<string, ComposerCommandGroupModel>();
+  for (const item of items) {
+    const id = `linear:${item.issue.workspaceUrlKey}`;
+    const existing = groups.get(id);
+    if (existing) {
+      existing.items.push(item);
+      continue;
+    }
+    groups.set(id, {
+      id,
+      label: item.issue.workspaceName,
+      items: [item],
+    });
+  }
+  return [...groups.values()];
+}
+
 export function groupCommandItems(
   items: ComposerCommandItem[],
   triggerKind: ComposerTriggerKind | null,
@@ -278,9 +298,8 @@ export function groupCommandItems(
     const threadItems = items.filter((item) => item.type === "thread");
     const localItems = items.filter((item) => item.type === "local-root" || item.type === "path");
     const agentItems = items.filter((item) => item.type === "agent");
-    const linearItems = items.filter(
-      (item) => item.type === "linear-issue" || item.type === "linear-create",
-    );
+    const linearCreateItems = items.filter((item) => item.type === "linear-create");
+    const linearIssueItems = items.filter((item) => item.type === "linear-issue");
     const otherItems = items.filter(
       (item) =>
         item.type !== "plugin" &&
@@ -305,8 +324,18 @@ export function groupCommandItems(
     if (agentItems.length > 0) {
       groups.push({ id: "subagents", label: "Subagents", items: agentItems });
     }
-    if (linearItems.length > 0) {
-      groups.push({ id: "linear", label: "Linear", items: linearItems });
+    const linearWorkspaceGroups = groupLinearIssueItems(linearIssueItems);
+    if (linearWorkspaceGroups.length > 1) {
+      groups.push(...linearWorkspaceGroups);
+      if (linearCreateItems.length > 0) {
+        groups.push({ id: "linear", label: "Linear", items: linearCreateItems });
+      }
+    } else if (linearCreateItems.length > 0 || linearIssueItems.length > 0) {
+      groups.push({
+        id: "linear",
+        label: "Linear",
+        items: [...linearCreateItems, ...linearIssueItems],
+      });
     }
     if (otherItems.length > 0) {
       groups.push({ id: "other", label: null, items: otherItems });

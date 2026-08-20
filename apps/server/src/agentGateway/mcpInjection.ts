@@ -20,6 +20,7 @@ import type {
   AgentGatewayMcpConnection,
   AgentGatewayStdioProxySpawn,
 } from "./Services/AgentGatewayCredentials.ts";
+import { mergeAcpMcpServers } from "./mcpMerge.ts";
 
 export const SYNARA_MCP_SERVER_NAME = "synara";
 export const SYNARA_AGENT_GATEWAY_TOKEN_ENV = "SYNARA_AGENT_GATEWAY_TOKEN";
@@ -288,4 +289,14 @@ export function buildAcpSynaraMcpServers(input: {
       ],
     },
   ];
+}
+
+/** Synara plus the provider's own MCP servers. Never replaces `linear`. */
+export function buildAcpSessionMcpServers(input: {
+  readonly connection: AgentGatewayMcpConnection;
+  readonly initializeResult: AcpInitializeCapabilitiesView;
+  readonly stdioProxy: AcpStdioProxySpawn;
+  readonly userServers?: ReadonlyArray<Acp.McpServer>;
+}): Array<Acp.McpServer> {
+  return mergeAcpMcpServers(input.userServers ?? [], buildAcpSynaraMcpServers(input));
 }

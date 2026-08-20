@@ -576,17 +576,12 @@ function WorktreeBadgeGlyph({ className }: { className?: string }) {
   return <WorktreeIcon aria-hidden="true" className={sidebarGlyphClass("meta", className)} />;
 }
 
-/** Pulsing green dot shown before a project name while a dev run is live. */
+/** Green terminal glyph shown on a project row while a dev run is live. */
 function ProjectRunIndicatorDot({ className }: { className?: string }) {
   return (
-    <span
-      aria-hidden="true"
-      title="Dev server running"
-      className={cn(
-        "size-1.5 shrink-0 rounded-full bg-emerald-400 motion-safe:animate-pulse",
-        className,
-      )}
-    />
+    <span title="Dev server running" className="flex shrink-0 items-center">
+      <TerminalIcon aria-hidden="true" className={cn("size-3 text-emerald-400", className)} />
+    </span>
   );
 }
 

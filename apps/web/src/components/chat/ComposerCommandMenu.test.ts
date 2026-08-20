@@ -111,9 +111,12 @@ describe("groupCommandItems", () => {
         id: "issue-1",
         identifier: "ALE-22",
         title: "Kanban",
-        url: "https://linear.app/issue/ALE-22",
+        url: "https://linear.app/alekdob/issue/ALE-22",
         stateName: "In Progress",
         projectName: "Quack",
+        workspaceId: "org-1",
+        workspaceName: "Alek",
+        workspaceUrlKey: "alekdob",
       },
       label: "ALE-22 Kanban",
       description: "Quack",
@@ -129,6 +132,68 @@ describe("groupCommandItems", () => {
         id: "local",
         label: "Local",
         items: [pathItem],
+      },
+    ]);
+  });
+
+  it("splits Linear issues into one group per workspace", () => {
+    const alekIssue: ComposerCommandItem = {
+      id: "linear-issue:ale-22",
+      type: "linear-issue",
+      issue: {
+        id: "issue-1",
+        identifier: "ALE-22",
+        title: "Kanban",
+        url: "https://linear.app/alekdob/issue/ALE-22",
+        stateName: "In Progress",
+        projectName: "Quack",
+        workspaceId: "org-1",
+        workspaceName: "Alek",
+        workspaceUrlKey: "alekdob",
+      },
+      label: "ALE-22 Kanban",
+      description: "Quack",
+    };
+    const esopoIssue: ComposerCommandItem = {
+      id: "linear-issue:esp-1",
+      type: "linear-issue",
+      issue: {
+        id: "issue-2",
+        identifier: "ESP-1",
+        title: "Login",
+        url: "https://linear.app/esopo/issue/ESP-1",
+        stateName: "Todo",
+        projectName: "App",
+        workspaceId: "org-2",
+        workspaceName: "Esopo",
+        workspaceUrlKey: "esopo",
+      },
+      label: "ESP-1 Login",
+      description: "App",
+    };
+    const createItem: ComposerCommandItem = {
+      id: "linear-create",
+      type: "linear-create",
+      title: "",
+      label: "New Linear issue",
+      description: "Create a Linear issue",
+    };
+
+    expect(groupCommandItems([alekIssue, esopoIssue, createItem], "mention", true)).toEqual([
+      {
+        id: "linear:alekdob",
+        label: "Alek",
+        items: [alekIssue],
+      },
+      {
+        id: "linear:esopo",
+        label: "Esopo",
+        items: [esopoIssue],
+      },
+      {
+        id: "linear",
+        label: "Linear",
+        items: [createItem],
       },
     ]);
   });
