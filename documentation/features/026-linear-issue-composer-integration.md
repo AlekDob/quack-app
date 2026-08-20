@@ -57,12 +57,12 @@ Diario: [2026-08-20](../diary/2026-08-20.md) (associazione Linear per progetto +
 | Component  | `apps/web/src/components/chat/MentionChipIcon.tsx`                          | Icona Linear su chip composer/messaggio                                                     |
 | Component  | `apps/web/src/components/chat/InlineMentionChip.tsx`                        | Label = nome; click apre Linear                                                             |
 | Component  | `apps/web/src/components/composer-nodes/index.tsx`                          | Label chip Lexical per kind `linear`                                                        |
-| Component  | `apps/web/src/components/chat/LinearCreateIssueDialog.tsx`                  | Workspace (se >1) + team + progetto; prop `defaults` pre-seleziona                          |
-| Component  | `apps/web/src/components/ChatView.tsx`                                      | Insert mention, Ask/Always/Never, Environment mentions, passa `defaults` al dialog create   |
+| Component  | `apps/web/src/components/chat/LinearCreateIssueDialog.tsx`                  | Workspace (se >1) + team + progetto; legge i default del project al mount            |
+| Component  | `apps/web/src/components/ChatView.tsx`                                      | Insert mention, Ask/Always/Never, Environment mentions, passa `projectId` al dialog create |
 | Component  | `apps/web/src/components/ProjectSettingsDialog.tsx`                         | Campi team/progetto Linear per progetto, dietro disclosure "Linear (optional)"              |
-| Component  | `apps/web/src/components/Sidebar.tsx`                                       | Passa `projectId` a `ProjectSettingsDialog`                                                  |
-| Util       | `apps/web/src/lib/projectLinearDefaults.ts`                                 | `read/writeProjectLinearDefaults` — localStorage per macchina, chiave per projectId          |
-| Test       | `apps/web/src/lib/projectLinearDefaults.test.ts`                            | Round-trip, clear, ignora entry incomplete                                                   |
+| Component  | `apps/web/src/components/Sidebar.tsx`                                       | Passa `projectId` a `ProjectSettingsDialog`                                                 |
+| Util       | `apps/web/src/lib/projectLinearDefaults.ts`                                 | `read/writeProjectLinearDefaults` — localStorage per macchina, chiave per projectId         |
+| Test       | `apps/web/src/lib/projectLinearDefaults.test.ts`                            | Round-trip, clear, ignora entry incomplete                                                  |
 | Component  | `apps/web/src/components/settings/LinearSettingsPanel.tsx`                  | Lista workspace + nome + add key + disconnect                                               |
 | Component  | `apps/web/src/components/chat/environment/EnvironmentLinearSection.tsx`     | Righe uniche per `linear://` path                                                           |
 | Component  | `apps/web/src/components/chat/environment/EnvironmentPanel.tsx`             | Sezione Linear dopo PR                                                                      |
@@ -86,7 +86,7 @@ Pick issue → token `formatComposerMentionToken(name)` + mention `{ name, path:
 
 `@+` / `@+Kanban` → `linearComposerCreateQuery` → create come prima voce; search Linear usa il testo dopo `+`.
 
-"New Linear issue" → dialog (workspace se >1, team, progetto) → `linear.createIssue` → stesso insert chip + policy rinomina. Team/progetto iniziali: default salvato per il project attivo (`readProjectLinearDefaults`), altrimenti primo team disponibile.
+"New Linear issue" → dialog (workspace se >1, team, progetto) → `linear.createIssue` → stesso insert chip + policy rinomina. Team/progetto iniziali: default salvato per il project attivo, letto nell'initializer `useState` del form (al mount), altrimenti primo team disponibile.
 
 Edit project → disclosure "Linear (optional)" → scegli team (filtra progetti per team) → `writeProjectLinearDefaults(projectId, …)` al Save. `null` (nessun team) rimuove l'associazione.
 
@@ -144,6 +144,8 @@ API key solo nel secret store (`~/.synara/userdata/secrets/`, 0600). `settings.j
 **Gotcha:** un secondo org visibile nel picker `@` non entra negli agenti finché l'utente non aggiunge `linear-esopo` (o simile) nella _sua_ config MCP. Quack non scrive quel file.
 
 **Gotcha:** la key vecchia `linear-api-key` può far dire “Connected” senza riga in lista. `migrateLegacyLinearApiKey` promuove sempre quella key a un workspace (nome vero se Linear risponde, altrimenti placeholder `Linear`). Un secondo workspace = un’altra key in **Add another workspace** → Save — non sostituisce la prima.
+
+**Gotcha:** `readProjectLinearDefaults` non va chiamata nel render di un componente compilato da React Compiler. Il compiler la considera pura e mette in cache il risultato con chiave sull'argomento: in `ChatView` (`activeProjectId` stabile) il valore restava congelato, quindi un default salvato a chat aperta non arrivava mai al dialog `@+`. Va letta al mount (initializer di `useState`) del componente che la usa. Vedi diario 2026-08-20.
 
 **Gotcha:** l'associazione team/progetto per project (`ProjectSettingsDialog`) vive in localStorage, non in `project.meta.update` / read model server. Non sincronizza tra macchine e non compare in `synara.getSettings`. Se serve condividerla tra dispositivi va spostata nel comando server — è una scelta deliberata per evitare contratto + evento + projection + reducer web per un default UI.
 
