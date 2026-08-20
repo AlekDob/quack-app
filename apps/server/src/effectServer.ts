@@ -37,6 +37,7 @@ import { ProviderRuntimeReconciler } from "./provider/Services/ProviderRuntimeRe
 import { ProviderService, type ProviderServiceShape } from "./provider/Services/ProviderService";
 import { ServerLifecycleEvents } from "./serverLifecycleEvents";
 import { ServerRuntimeStartup } from "./serverRuntimeStartup";
+import { ServerSecretStore } from "./auth/Services/ServerSecretStore";
 import { ServerSettingsService } from "./serverSettings";
 import { makeServerReadiness } from "./server/readiness";
 import { makeServerShutdownController, type ServerShutdownController } from "./serverShutdown";
@@ -72,6 +73,7 @@ export interface ServerShape {
     | ProviderService
     | ServerRuntimeStartup
     | ServerSettingsService
+    | ServerSecretStore
     | ThreadDeletionReactor
     | SqlClient.SqlClient
   >;

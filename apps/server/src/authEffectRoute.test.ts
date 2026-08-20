@@ -15,6 +15,7 @@ import { HttpRouter } from "effect/unstable/http";
 import { describe, expect, it } from "vitest";
 
 import { AuthError, ServerAuth, type ServerAuthShape } from "./auth/Services/ServerAuth";
+import { ServerSecretStore } from "./auth/Services/ServerSecretStore";
 import {
   SessionCredentialService,
   type SessionCredentialServiceShape,
@@ -28,6 +29,7 @@ import {
   binaryUploadEffectRouteLayer,
 } from "./http";
 import { ProviderAdapterRegistry } from "./provider/Services/ProviderAdapterRegistry";
+import { ServerSettingsService } from "./serverSettings";
 
 const currentSessionId = AuthSessionId.makeUnsafe("11111111-1111-4111-8111-111111111111");
 const otherSessionId = AuthSessionId.makeUnsafe("22222222-2222-4222-8222-222222222222");
@@ -124,6 +126,15 @@ async function withAuthEffectServer(
             getByProvider: () => Effect.die("voice adapter not used in this test"),
             listProviders: () => Effect.succeed([]),
           }),
+          // Linear upload route only: these tests never reach it, but the handler
+          // resolves both services, so the layer must be satisfiable.
+          Layer.succeed(ServerSecretStore, {
+            get: () => Effect.succeed(null),
+            set: () => Effect.void,
+            getOrCreateRandom: () => Effect.die("secret store not used in this test"),
+            remove: () => Effect.void,
+          }),
+          ServerSettingsService.layerTest(),
           ManagedAttachmentRepositoryLive.pipe(Layer.provideMerge(SqlitePersistenceMemory)),
           NodeServices.layer,
         ),

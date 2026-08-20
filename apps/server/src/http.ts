@@ -14,6 +14,7 @@ import {
 import {
   ATTACHMENT_CANCEL_ROUTE_PATH,
   ATTACHMENT_UPLOAD_ROUTE_PATH,
+  LINEAR_UPLOAD_ROUTE_PATH,
   VOICE_TRANSCRIPTION_UPLOAD_ROUTE_PATH,
 } from "@synara/shared/binaryTransfer";
 import { EDITOR_ICON_ROUTE_PATH } from "@synara/shared/editorIcons";
@@ -29,10 +30,14 @@ import {
 import { resolveAttachmentPathById } from "./attachmentStore.ts";
 import { authErrorResponse, makeEffectAuthRequest } from "./auth/effectHttp";
 import { AuthError, ServerAuth } from "./auth/Services/ServerAuth";
+import { ServerSecretStore } from "./auth/Services/ServerSecretStore";
 import { SessionCredentialService } from "./auth/Services/SessionCredentialService";
 import { deriveAuthClientMetadata } from "./auth/utils";
 import { ServerConfig, type ServerConfigShape } from "./config";
 import { resolveCachedEditorIcon } from "./editorAppIcons";
+import { uploadLinearFile } from "./linear/linearClient";
+import { requireLinearWorkspaceKeys } from "./linear/linearWorkspaces";
+import { ServerSettingsService } from "./serverSettings";
 import { LOCAL_IMAGE_ROUTE_PATH, resolveAllowedLocalPreviewFile } from "./localImageFiles.ts";
 import { ProjectFaviconResolver } from "./project/Services/ProjectFaviconResolver";
 import { ProjectionSnapshotQuery } from "./orchestration/Services/ProjectionSnapshotQuery";
@@ -947,6 +952,43 @@ const binaryUploadEffectHandler = Effect.gen(function* () {
     );
   }
 
+  if (url.pathname === LINEAR_UPLOAD_ROUTE_PATH) {
+    const workspaceId = url.searchParams.get("workspaceId")?.trim() ?? "";
+    const name = url.searchParams.get("name")?.trim() ?? "";
+    const mimeType = url.searchParams.get("mimeType")?.trim() ?? "";
+    if (!workspaceId || !name || !mimeType.startsWith("image/")) {
+      return HttpServerResponse.jsonUnsafe(
+        { error: "Linear upload metadata is invalid." },
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    const declaredLength = Number(request.headers["content-length"] ?? "0");
+    if (Number.isFinite(declaredLength) && declaredLength > PROVIDER_SEND_TURN_MAX_IMAGE_BYTES) {
+      return HttpServerResponse.jsonUnsafe(
+        { error: "Request body too large." },
+        { status: 413, headers: corsHeaders },
+      );
+    }
+    const settings = yield* (yield* ServerSettingsService).getSettings;
+    const keys = yield* requireLinearWorkspaceKeys(
+      yield* ServerSecretStore,
+      settings.linear.workspaces,
+    );
+    const entry = keys.find((item) => item.workspace.id === workspaceId);
+    if (!entry) {
+      return HttpServerResponse.jsonUnsafe(
+        { error: "Choose a Linear workspace in Settings first." },
+        { status: 400, headers: corsHeaders },
+      );
+    }
+    const bytes = yield* readEffectBinary(request, PROVIDER_SEND_TURN_MAX_IMAGE_BYTES);
+    const assetUrl = yield* Effect.tryPromise({
+      try: () => uploadLinearFile(entry.apiKey, { name, mimeType, bytes }),
+      catch: (cause) => cause,
+    });
+    return HttpServerResponse.jsonUnsafe({ assetUrl }, { status: 201, headers: corsHeaders });
+  }
+
   if (url.pathname === VOICE_TRANSCRIPTION_UPLOAD_ROUTE_PATH) {
     const provider = url.searchParams.get("provider")?.trim() ?? "";
     const cwd = url.searchParams.get("cwd")?.trim() ?? "";
@@ -1024,7 +1066,10 @@ export const binaryUploadEffectRouteLayer = Layer.merge(
   HttpRouter.add("*", ATTACHMENT_UPLOAD_ROUTE_PATH, binaryUploadEffectHandler),
   Layer.merge(
     HttpRouter.add("*", ATTACHMENT_CANCEL_ROUTE_PATH, binaryUploadEffectHandler),
-    HttpRouter.add("*", VOICE_TRANSCRIPTION_UPLOAD_ROUTE_PATH, binaryUploadEffectHandler),
+    Layer.merge(
+      HttpRouter.add("*", VOICE_TRANSCRIPTION_UPLOAD_ROUTE_PATH, binaryUploadEffectHandler),
+      HttpRouter.add("*", LINEAR_UPLOAD_ROUTE_PATH, binaryUploadEffectHandler),
+    ),
   ),
 );
 

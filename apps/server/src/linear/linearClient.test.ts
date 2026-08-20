@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { outboundHttp } from "@synara/shared/outboundHttp";
+
 import { fetchJson } from "../providerUsage/http";
 import {
   createLinearIssue,
@@ -7,9 +9,11 @@ import {
   LinearApiError,
   searchLinearIssues,
   searchLinearIssuesAcrossWorkspaces,
+  uploadLinearFile,
 } from "./linearClient";
 
 vi.mock("../providerUsage/http", () => ({ fetchJson: vi.fn() }));
+vi.mock("@synara/shared/outboundHttp", () => ({ outboundHttp: { request: vi.fn() } }));
 
 const fetchJsonMock = vi.mocked(fetchJson);
 
@@ -132,5 +136,51 @@ describe("linearClient", () => {
     });
 
     await expect(fetchLinearOrganization("key")).resolves.toEqual(WORKSPACE);
+  });
+
+  describe("uploadLinearFile", () => {
+    const FILE = { name: "shot.png", mimeType: "image/png", bytes: new Uint8Array([1, 2, 3]) };
+
+    function replyUpload(uploadUrl: string) {
+      reply({
+        data: {
+          fileUpload: {
+            success: true,
+            uploadFile: {
+              uploadUrl,
+              assetUrl: "https://uploads.linear.app/asset/1",
+              headers: [{ key: "x-goog-content-length-range", value: "0,3" }],
+            },
+          },
+        },
+      });
+    }
+
+    it("rejects an upload URL on an unexpected host", async () => {
+      replyUpload("https://evil.example.com/put");
+
+      await expect(uploadLinearFile("key", FILE)).rejects.toBeInstanceOf(LinearApiError);
+      expect(vi.mocked(outboundHttp.request)).not.toHaveBeenCalled();
+    });
+
+    it("PUTs the bytes with every returned header and returns the asset URL", async () => {
+      replyUpload("https://storage.googleapis.com/bucket/obj?sig=1");
+      vi.mocked(outboundHttp.request).mockResolvedValue({
+        status: 200,
+        headers: new Headers(),
+        body: new Uint8Array(),
+        url: "https://storage.googleapis.com/bucket/obj",
+      });
+
+      await expect(uploadLinearFile("key", FILE)).resolves.toBe(
+        "https://uploads.linear.app/asset/1",
+      );
+      const call = vi.mocked(outboundHttp.request).mock.calls.at(-1)?.[0];
+      expect(call?.method).toBe("PUT");
+      expect(call?.headers).toEqual({
+        "Content-Type": "image/png",
+        "x-goog-content-length-range": "0,3",
+      });
+    });
   });
 });

@@ -4,12 +4,14 @@
 
 import {
   LINEAR_ISSUE_SEARCH_LIMIT,
+  PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
   type LinearCreateIssueInput,
   type LinearIssue,
   type LinearWorkspace,
   type LinearWorkspaceCreateOptions,
 } from "@synara/contracts";
 import { linearWorkspaceDisplayName } from "@synara/shared/linearMentions";
+import { outboundHttp } from "@synara/shared/outboundHttp";
 
 import { fetchJson } from "../providerUsage/http";
 
@@ -224,6 +226,88 @@ export async function listLinearCreateOptionsAcrossWorkspaces(
   return { workspaces: results };
 }
 
+// Hosts Linear hands back as signed upload targets. The `uploadUrl` comes from a
+// network response, so it is validated before we PUT bytes at it.
+const UPLOAD_HOSTS = ["uploads.linear.app", "storage.googleapis.com"] as const;
+
+function assertLinearUploadUrl(uploadUrl: string): URL {
+  let url: URL;
+  try {
+    url = new URL(uploadUrl);
+  } catch {
+    throw new LinearApiError("Linear returned an invalid upload URL.");
+  }
+  const allowed =
+    url.protocol === "https:" &&
+    UPLOAD_HOSTS.some((host) => url.hostname === host || url.hostname.endsWith(`.${host}`));
+  if (!allowed) {
+    throw new LinearApiError("Linear returned an upload URL on an unexpected host.");
+  }
+  return url;
+}
+
+/** Uploads one file to Linear's storage and returns the asset URL to reference in markdown. */
+export async function uploadLinearFile(
+  apiKey: string,
+  input: { name: string; mimeType: string; bytes: Uint8Array },
+): Promise<string> {
+  const data = await linearGraphql(
+    apiKey,
+    `mutation($contentType: String!, $filename: String!, $size: Int!) {
+      fileUpload(contentType: $contentType, filename: $filename, size: $size) {
+        success
+        uploadFile { uploadUrl assetUrl headers { key value } }
+      }
+    }`,
+    { contentType: input.mimeType, filename: input.name, size: input.bytes.byteLength },
+  );
+  const payload = data.fileUpload as {
+    success?: unknown;
+    uploadFile?: {
+      uploadUrl?: unknown;
+      assetUrl?: unknown;
+      headers?: ReadonlyArray<{ key?: unknown; value?: unknown }> | null;
+    } | null;
+  } | null;
+  const uploadFile = payload?.uploadFile;
+  const uploadUrl = text(uploadFile?.uploadUrl);
+  const assetUrl = text(uploadFile?.assetUrl);
+  if (!payload?.success || !uploadUrl || !assetUrl) {
+    throw new LinearApiError("Linear did not accept the file upload.");
+  }
+  const url = assertLinearUploadUrl(uploadUrl);
+
+  // Every header Linear returns must be replayed verbatim (exact casing included) or the
+  // signed URL answers 403. The URL expires in ~60s, so this follows the prepare at once.
+  const headers: Record<string, string> = { "Content-Type": input.mimeType };
+  for (const header of uploadFile?.headers ?? []) {
+    const key = text(header.key);
+    if (key) headers[key] = text(header.value);
+  }
+
+  const response = await outboundHttp.request({
+    policy: {
+      service: "linear-file-upload",
+      allowedOrigins: [url.origin],
+      timeoutMs: 60_000,
+      maxRequestBytes: PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
+      maxResponseBytes: 64 * 1024,
+      maxRedirects: 0,
+      maxConcurrent: 1,
+      maxQueued: 8,
+      requirePublicAddress: true,
+    },
+    url,
+    method: "PUT",
+    headers,
+    body: input.bytes,
+  });
+  if (response.status < 200 || response.status >= 300) {
+    throw new LinearApiError(`Linear rejected the file upload with status ${response.status}.`);
+  }
+  return assetUrl;
+}
+
 export async function createLinearIssue(
   apiKey: string,
   workspace: LinearWorkspace,
@@ -239,6 +323,7 @@ export async function createLinearIssue(
         title: input.title,
         teamId: input.teamId,
         ...(input.projectId ? { projectId: input.projectId } : {}),
+        ...(input.description ? { description: input.description } : {}),
       },
     },
   );

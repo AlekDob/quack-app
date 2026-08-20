@@ -65,5 +65,7 @@ export const LinearCreateIssueInput = Schema.Struct({
   title: TrimmedNonEmptyString.check(Schema.isMaxLength(256)),
   teamId: TrimmedNonEmptyString,
   projectId: Schema.optional(TrimmedNonEmptyString),
+  // Markdown body. Pasted images are appended as `![name](assetUrl)` by the client.
+  description: Schema.optional(TrimmedNonEmptyString.check(Schema.isMaxLength(16_000))),
 });
 export type LinearCreateIssueInput = typeof LinearCreateIssueInput.Type;

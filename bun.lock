@@ -14,7 +14,7 @@
     },
     "apps/desktop": {
       "name": "@synara/desktop",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "dependencies": {
         "effect": "catalog:",
         "electron": "40.10.6",
@@ -43,7 +43,7 @@
     },
     "apps/server": {
       "name": "@synara/cli",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "bin": {
         "synara": "dist/index.mjs",
         "synara-restore-migration-backup": "dist/restoreMigrationBackup.mjs",
@@ -85,7 +85,7 @@
     },
     "apps/web": {
       "name": "@synara/web",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "dependencies": {
         "@base-ui/react": "^1.5.0",
         "@dnd-kit/core": "^6.3.1",
@@ -155,7 +155,7 @@
     },
     "packages/contracts": {
       "name": "@synara/contracts",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "dependencies": {
         "effect": "catalog:",
       },

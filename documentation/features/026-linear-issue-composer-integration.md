@@ -28,55 +28,62 @@ Vedi [018-linear-project-routing.md](018-linear-project-routing.md) per il deep-
 
 **2026-08-20 (QUACK-3):** "Edit project" (Sidebar) ha un campo opzionale team/progetto Linear per progetto, dietro un disclosure "Linear (optional)" (chiuso di default, riepilogo inline `TEAM · Progetto` / `Not set`). Salvato in localStorage per macchina (`projectLinearDefaults.ts`), non nel read model server — è un default UI, non metadata da sincronizzare tra macchine. `LinearCreateIssueDialog` lo legge per pre-selezionare workspace/team/progetto invece del primo team della lista.
 
+**2026-08-20 (descrizione + immagini):** il dialog "New Linear issue" ha un campo **Description** e permette di allegare immagini incollandole (Cmd+V), trascinandole o dal pulsante "Add image". Linear non ha un campo immagine su `issueCreate`: le immagini vengono caricate sul suo storage e appese al body come markdown `![nome](assetUrl)`, come fa Linear stesso. Upload al submit (non al paste) così annullare il dialog non lascia asset orfani; se un upload fallisce nessun ticket viene creato.
+
 Diario: [2026-08-20](../diary/2026-08-20.md) (associazione Linear per progetto + disclosure UI); [2026-08-18](../diary/2026-08-18.md) (N workspace + MCP pass-through; chip + Environment + `@+`); [2026-08-14](../diary/2026-08-14.md) (prima integrazione, solo rinomina).
 
 ### Files
 
-| Type       | Path                                                                        | Exports/Purpose                                                                             |
-| ---------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Util       | `packages/shared/src/linearMentions.ts`                                     | `linear://alekdob/ALE-22` + fallback `linear://ALE-22`                                      |
-| Test       | `packages/shared/src/linearMentions.test.ts`                                | Round-trip slug/id; reject `plugin://linear`                                                |
-| Config     | `packages/shared/package.json`                                              | Export `@synara/shared/linearMentions`                                                      |
-| Model/Type | `packages/contracts/src/linear.ts`                                          | `LinearWorkspace`, `LinearIssue` (+ workspace\*), create options per workspace              |
-| Model/Type | `packages/contracts/src/settings.ts`                                        | `linear.workspaces[]`, `apiKeyConfigured`, patch `apiKey` / `removeWorkspaceId`             |
-| Contratti  | `packages/contracts/src/ws.ts`, `rpc.ts`, `ipc.ts`                          | `linear.searchIssues`, `linear.listCreateOptions`, `linear.createIssue`                     |
-| Service    | `apps/server/src/linear/linearCredentials.ts`                               | Secret `linear-api-key:<orgId>`; legacy `linear-api-key`                                    |
-| Service    | `apps/server/src/linear/linearWorkspaces.ts`                                | Add/remove/migrate workspace; cap 8                                                         |
-| Service    | `apps/server/src/linear/linearClient.ts`                                    | GraphQL search/create + org lookup (`organization` / `viewer.organization`); fan-out search |
-| Test       | `apps/server/src/linear/linearClient.test.ts`                               | Filtro stato, 401, fan-out con una key rotta, org lookup                                    |
-| Test       | `apps/server/src/linear/linearWorkspaces.test.ts`                           | Migrate key legacy anche offline; add non perde il primo workspace                          |
-| Service    | `apps/server/src/serverSettings.ts`                                         | Persiste `workspaces`; key solo nel secret store                                            |
-| Service    | `apps/server/src/wsRpc.ts`                                                  | Handler WS fan-out su tutte le key                                                          |
-| Util       | `apps/server/src/agentGateway/mcpMerge.ts`                                  | `mergeNamedMcpServers` / `mergeAcpMcpServers` — synara vince solo su `synara`               |
-| Util       | `apps/server/src/provider/userMcpConfig.ts`                                 | Legge `~/.cursor/mcp.json` (e analoghi grok/droid) senza scriverli                          |
-| Config     | `apps/web/src/appSettings.ts`                                               | `linearRenameChat`, `showEnvironmentLinear`                                                 |
-| Util       | `apps/web/src/lib/composerMentions.ts`                                      | Chip kind `"linear"`; token keys include identifier                                         |
-| Util       | `apps/web/src/lib/linearIssueUrls.ts`                                       | Cache URL keyed by `linear://` path                                                         |
-| Hook       | `apps/web/src/hooks/useComposerCommandMenuItems.ts`                         | Voci menu; `linearComposerCreateQuery` per `@+`                                             |
-| Component  | `apps/web/src/components/chat/ComposerCommandMenu.tsx`                      | Un gruppo per workspace se ce n'è più di uno                                                |
-| Component  | `apps/web/src/components/chat/MentionChipIcon.tsx`                          | Icona Linear su chip composer/messaggio                                                     |
-| Component  | `apps/web/src/components/chat/InlineMentionChip.tsx`                        | Label = nome; click apre Linear                                                             |
-| Component  | `apps/web/src/components/composer-nodes/index.tsx`                          | Label chip Lexical per kind `linear`                                                        |
-| Component  | `apps/web/src/components/chat/LinearCreateIssueDialog.tsx`                  | Workspace (se >1) + team + progetto; legge i default del project al mount            |
-| Component  | `apps/web/src/components/ChatView.tsx`                                      | Insert mention, Ask/Always/Never, Environment mentions, passa `projectId` al dialog create |
-| Component  | `apps/web/src/components/ProjectSettingsDialog.tsx`                         | Campi team/progetto Linear per progetto, dietro disclosure "Linear (optional)"              |
-| Component  | `apps/web/src/components/Sidebar.tsx`                                       | Passa `projectId` a `ProjectSettingsDialog`                                                 |
-| Util       | `apps/web/src/lib/projectLinearDefaults.ts`                                 | `read/writeProjectLinearDefaults` — localStorage per macchina, chiave per projectId         |
-| Test       | `apps/web/src/lib/projectLinearDefaults.test.ts`                            | Round-trip, clear, ignora entry incomplete                                                  |
-| Component  | `apps/web/src/components/settings/LinearSettingsPanel.tsx`                  | Lista workspace + nome + add key + disconnect                                               |
-| Component  | `apps/web/src/components/chat/environment/EnvironmentLinearSection.tsx`     | Righe uniche per `linear://` path                                                           |
-| Component  | `apps/web/src/components/chat/environment/EnvironmentPanel.tsx`             | Sezione Linear dopo PR                                                                      |
-| Route/Page | `apps/web/src/routes/_chat.settings.tsx`                                    | Toggle Environment → Linear                                                                 |
-| Config     | `apps/web/src/settingsNavigation.ts`                                        | Sezione Settings `linear`                                                                   |
-| Config     | `apps/web/src/settingsSearchIndex.ts`                                       | Search: Issues, API key, rename, Environment Linear                                         |
-| Util       | `apps/web/src/composer-editor-mentions.ts`                                  | Segment kind `linear` da mention refs                                                       |
-| Test       | `apps/web/src/lib/composerMentions.test.ts`                                 | `resolveMentionChipKind("linear")` resta `"path"` senza ref `linear://`                     |
-| Test       | `apps/web/src/composer-editor-mentions.test.ts`                             | `@linear` plugin vs `@"ALE-22 Kanban"` linear                                               |
-| Test       | `apps/web/src/components/chat/environment/EnvironmentLinearSection.test.ts` | Dedup per path; due org con stesso identifier                                               |
-| Test       | `apps/web/src/components/chat/ComposerCommandMenu.test.ts`                  | `@+` alza Linear; split per workspace                                                       |
-| Test       | `apps/web/src/hooks/useComposerCommandMenuItems.test.ts`                    | `linearComposerCreateQuery`                                                                 |
-| Test       | `apps/server/src/agentGateway/mcpMerge.test.ts`                             | Merge non tocca `linear`                                                                    |
-| Test       | `apps/server/src/provider/userMcpConfig.test.ts`                            | Parse stdio/http mcp.json                                                                   |
+| Type       | Path                                                                        | Exports/Purpose                                                                                                 |
+| ---------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Util       | `packages/shared/src/linearMentions.ts`                                     | `linear://alekdob/ALE-22` + fallback `linear://ALE-22`                                                          |
+| Test       | `packages/shared/src/linearMentions.test.ts`                                | Round-trip slug/id; reject `plugin://linear`                                                                    |
+| Config     | `packages/shared/package.json`                                              | Export `@synara/shared/linearMentions`                                                                          |
+| Model/Type | `packages/contracts/src/linear.ts`                                          | `LinearWorkspace`, `LinearIssue` (+ workspace\*), create options per workspace                                  |
+| Model/Type | `packages/contracts/src/settings.ts`                                        | `linear.workspaces[]`, `apiKeyConfigured`, patch `apiKey` / `removeWorkspaceId`                                 |
+| Contratti  | `packages/contracts/src/ws.ts`, `rpc.ts`, `ipc.ts`                          | `linear.searchIssues`, `linear.listCreateOptions`, `linear.createIssue`                                         |
+| Service    | `apps/server/src/linear/linearCredentials.ts`                               | Secret `linear-api-key:<orgId>`; legacy `linear-api-key`                                                        |
+| Service    | `apps/server/src/linear/linearWorkspaces.ts`                                | Add/remove/migrate workspace; cap 8                                                                             |
+| Service    | `apps/server/src/linear/linearClient.ts`                                    | GraphQL search/create + org lookup (`organization` / `viewer.organization`); fan-out search; `uploadLinearFile` |
+| Route      | `apps/server/src/http.ts`                                                   | Branch `/api/linear/upload` in `binaryUploadEffectHandler` (byte grezzi → assetUrl)                             |
+| Config     | `packages/shared/src/binaryTransfer.ts`                                     | `LINEAR_UPLOAD_ROUTE_PATH`                                                                                      |
+| Util       | `apps/web/src/lib/linearIssueDescription.ts`                                | `buildLinearIssueDescription` — body + `![nome](assetUrl)`                                                      |
+| Test       | `apps/web/src/lib/linearIssueDescription.test.ts`                           | 0/1/N immagini, body vuoto                                                                                      |
+| Util       | `apps/web/src/lib/linearReactQuery.ts`                                      | `uploadLinearImage` — POST byte grezzi su `/api/linear/upload`                                                  |
+| Test       | `apps/server/src/linear/linearClient.test.ts`                               | Filtro stato, 401, fan-out con una key rotta, org lookup                                                        |
+| Test       | `apps/server/src/linear/linearWorkspaces.test.ts`                           | Migrate key legacy anche offline; add non perde il primo workspace                                              |
+| Service    | `apps/server/src/serverSettings.ts`                                         | Persiste `workspaces`; key solo nel secret store                                                                |
+| Service    | `apps/server/src/wsRpc.ts`                                                  | Handler WS fan-out su tutte le key                                                                              |
+| Util       | `apps/server/src/agentGateway/mcpMerge.ts`                                  | `mergeNamedMcpServers` / `mergeAcpMcpServers` — synara vince solo su `synara`                                   |
+| Util       | `apps/server/src/provider/userMcpConfig.ts`                                 | Legge `~/.cursor/mcp.json` (e analoghi grok/droid) senza scriverli                                              |
+| Config     | `apps/web/src/appSettings.ts`                                               | `linearRenameChat`, `showEnvironmentLinear`                                                                     |
+| Util       | `apps/web/src/lib/composerMentions.ts`                                      | Chip kind `"linear"`; token keys include identifier                                                             |
+| Util       | `apps/web/src/lib/linearIssueUrls.ts`                                       | Cache URL keyed by `linear://` path                                                                             |
+| Hook       | `apps/web/src/hooks/useComposerCommandMenuItems.ts`                         | Voci menu; `linearComposerCreateQuery` per `@+`                                                                 |
+| Component  | `apps/web/src/components/chat/ComposerCommandMenu.tsx`                      | Un gruppo per workspace se ce n'è più di uno                                                                    |
+| Component  | `apps/web/src/components/chat/MentionChipIcon.tsx`                          | Icona Linear su chip composer/messaggio                                                                         |
+| Component  | `apps/web/src/components/chat/InlineMentionChip.tsx`                        | Label = nome; click apre Linear                                                                                 |
+| Component  | `apps/web/src/components/composer-nodes/index.tsx`                          | Label chip Lexical per kind `linear`                                                                            |
+| Component  | `apps/web/src/components/chat/LinearCreateIssueDialog.tsx`                  | Workspace (se >1) + team + progetto; legge i default del project al mount                                       |
+| Component  | `apps/web/src/components/ChatView.tsx`                                      | Insert mention, Ask/Always/Never, Environment mentions, passa `projectId` al dialog create                      |
+| Component  | `apps/web/src/components/ProjectSettingsDialog.tsx`                         | Campi team/progetto Linear per progetto, dietro disclosure "Linear (optional)"                                  |
+| Component  | `apps/web/src/components/Sidebar.tsx`                                       | Passa `projectId` a `ProjectSettingsDialog`                                                                     |
+| Util       | `apps/web/src/lib/projectLinearDefaults.ts`                                 | `read/writeProjectLinearDefaults` — localStorage per macchina, chiave per projectId                             |
+| Test       | `apps/web/src/lib/projectLinearDefaults.test.ts`                            | Round-trip, clear, ignora entry incomplete                                                                      |
+| Component  | `apps/web/src/components/settings/LinearSettingsPanel.tsx`                  | Lista workspace + nome + add key + disconnect                                                                   |
+| Component  | `apps/web/src/components/chat/environment/EnvironmentLinearSection.tsx`     | Righe uniche per `linear://` path                                                                               |
+| Component  | `apps/web/src/components/chat/environment/EnvironmentPanel.tsx`             | Sezione Linear dopo PR                                                                                          |
+| Route/Page | `apps/web/src/routes/_chat.settings.tsx`                                    | Toggle Environment → Linear                                                                                     |
+| Config     | `apps/web/src/settingsNavigation.ts`                                        | Sezione Settings `linear`                                                                                       |
+| Config     | `apps/web/src/settingsSearchIndex.ts`                                       | Search: Issues, API key, rename, Environment Linear                                                             |
+| Util       | `apps/web/src/composer-editor-mentions.ts`                                  | Segment kind `linear` da mention refs                                                                           |
+| Test       | `apps/web/src/lib/composerMentions.test.ts`                                 | `resolveMentionChipKind("linear")` resta `"path"` senza ref `linear://`                                         |
+| Test       | `apps/web/src/composer-editor-mentions.test.ts`                             | `@linear` plugin vs `@"ALE-22 Kanban"` linear                                                                   |
+| Test       | `apps/web/src/components/chat/environment/EnvironmentLinearSection.test.ts` | Dedup per path; due org con stesso identifier                                                                   |
+| Test       | `apps/web/src/components/chat/ComposerCommandMenu.test.ts`                  | `@+` alza Linear; split per workspace                                                                           |
+| Test       | `apps/web/src/hooks/useComposerCommandMenuItems.test.ts`                    | `linearComposerCreateQuery`                                                                                     |
+| Test       | `apps/server/src/agentGateway/mcpMerge.test.ts`                             | Merge non tocca `linear`                                                                                        |
+| Test       | `apps/server/src/provider/userMcpConfig.test.ts`                            | Parse stdio/http mcp.json                                                                                       |
 
 ### Data Flow
 
@@ -86,7 +93,7 @@ Pick issue → token `formatComposerMentionToken(name)` + mention `{ name, path:
 
 `@+` / `@+Kanban` → `linearComposerCreateQuery` → create come prima voce; search Linear usa il testo dopo `+`.
 
-"New Linear issue" → dialog (workspace se >1, team, progetto) → `linear.createIssue` → stesso insert chip + policy rinomina. Team/progetto iniziali: default salvato per il project attivo, letto nell'initializer `useState` del form (al mount), altrimenti primo team disponibile.
+"New Linear issue" → dialog (titolo, descrizione, immagini, workspace se >1, team, progetto). Al Create: upload sequenziale delle immagini su `/api/linear/upload` (una alla volta, mai burst di body concorrenti) → `buildLinearIssueDescription` → `linear.createIssue` → stesso insert chip + policy rinomina. Team/progetto iniziali: default salvato per il project attivo, letto nell'initializer `useState` del form (al mount), altrimenti primo team disponibile.
 
 Edit project → disclosure "Linear (optional)" → scegli team (filtra progetti per team) → `writeProjectLinearDefaults(projectId, …)` al Save. `null` (nessun team) rimuove l'associazione.
 
@@ -110,6 +117,9 @@ Agenti: Codex overlay copia `config.toml` e sostituisce solo synara. Claude `set
 - `linearWorkspaceDisplayName(workspace) → string` — `label` utente, altrimenti nome org Linear
 - `readProjectLinearDefaults(projectId) → { workspaceId, teamId, projectId } | null` — null se manca team o non c'è entry
 - `writeProjectLinearDefaults(projectId, value | null) → void` — `null` cancella l'entry
+- `uploadLinearFile(apiKey, { name, mimeType, bytes }) → assetUrl` — prepare `fileUpload` + PUT firmato
+- `buildLinearIssueDescription(text, images) → string` — body markdown, salta le parti vuote
+- `uploadLinearImage({ workspaceId, file }) → assetUrl` — client web, byte grezzi via HTTP
 
 ### State
 
@@ -148,6 +158,12 @@ API key solo nel secret store (`~/.synara/userdata/secrets/`, 0600). `settings.j
 **Gotcha:** `readProjectLinearDefaults` non va chiamata nel render di un componente compilato da React Compiler. Il compiler la considera pura e mette in cache il risultato con chiave sull'argomento: in `ChatView` (`activeProjectId` stabile) il valore restava congelato, quindi un default salvato a chat aperta non arrivava mai al dialog `@+`. Va letta al mount (initializer di `useState`) del componente che la usa. Vedi diario 2026-08-20.
 
 **Gotcha:** l'associazione team/progetto per project (`ProjectSettingsDialog`) vive in localStorage, non in `project.meta.update` / read model server. Non sincronizza tra macchine e non compare in `synara.getSettings`. Se serve condividerla tra dispositivi va spostata nel comando server — è una scelta deliberata per evitare contratto + evento + projection + reducer web per un default UI.
+
+**Gotcha:** il PUT sull'`uploadUrl` firmato deve rimandare **tutti** gli header restituiti da `fileUpload`, con la stessa capitalizzazione (`x-goog-content-length-range`, `cache-control`, `Content-Disposition`). Uno omesso o modificato → 403. L'URL firmato scade in ~60s, quindi prepare e PUT vanno di seguito, un file alla volta.
+
+**Gotcha:** l'`uploadUrl` arriva da una risposta di rete, quindi `uploadLinearFile` valida host e schema prima di mandarci byte (solo `https:` su `uploads.linear.app` / `storage.googleapis.com` e sottodomini).
+
+**Gotcha:** i byte delle immagini passano da HTTP (`/api/linear/upload`), non dall'RPC WebSocket: il frame è cappato a 2 MB (`MAX_WEBSOCKET_MESSAGE_BYTES`) e il base64 gonfia del ~37%. Stessa convenzione degli attachment del composer.
 
 ### Cosa NON fa (per scelta)
 
