@@ -2,7 +2,7 @@
 // Purpose: Create a Linear issue from the composer `@` menu (title, description, images, team, project).
 // Layer: Chat UI components
 
-import type { LinearIssue } from "@synara/contracts";
+import type { LinearCycle, LinearIssue } from "@synara/contracts";
 import { linearWorkspaceDisplayName } from "@synara/shared/linearMentions";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -38,6 +38,12 @@ import { ExpandedImageOverlay } from "./ExpandedImageOverlay";
 import type { ExpandedImagePreview } from "./ExpandedImagePreview";
 
 const NO_PROJECT = "none";
+const NO_CYCLE = "none";
+
+function linearCycleLabel(cycle: LinearCycle): string {
+  const label = cycle.name || `Cycle ${cycle.number}`;
+  return cycle.isActive ? `${label} · Current` : label;
+}
 
 export function LinearCreateIssueDialog(props: {
   /** Null keeps the dialog closed; a string (possibly empty) opens it prefilled. */
@@ -86,6 +92,7 @@ function LinearCreateIssueForm(props: {
   const [workspaceId, setWorkspaceId] = useState<string | null>(defaults?.workspaceId ?? null);
   const [teamId, setTeamId] = useState<string | null>(defaults?.teamId ?? null);
   const [projectId, setProjectId] = useState(defaults?.projectId ?? NO_PROJECT);
+  const [cycleId, setCycleId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const images = useLinearIssueImages();
 
@@ -93,6 +100,10 @@ function LinearCreateIssueForm(props: {
   const selectedWorkspace = workspaces.find((entry) => entry.workspace.id === selectedWorkspaceId);
   const teams = selectedWorkspace?.teams ?? [];
   const selectedTeamId = teamId ?? teams[0]?.id ?? null;
+  const selectedTeam = teams.find((team) => team.id === selectedTeamId);
+  const cycles = selectedTeam?.cycles ?? [];
+  const selectedCycleId = cycleId ?? cycles.find((cycle) => cycle.isActive)?.id ?? NO_CYCLE;
+  const selectedCycle = cycles.find((cycle) => cycle.id === selectedCycleId);
   const projects = (selectedWorkspace?.projects ?? []).filter(
     (project) => selectedTeamId !== null && project.teamIds.includes(selectedTeamId),
   );
@@ -120,6 +131,7 @@ function LinearCreateIssueForm(props: {
         title: title.trim(),
         teamId: selectedTeamId,
         ...(projectId === NO_PROJECT ? {} : { projectId }),
+        ...(selectedCycleId === NO_CYCLE ? {} : { cycleId: selectedCycleId }),
         ...(body.length > 0 ? { description: body } : {}),
       });
       props.onCreated(issue);
@@ -178,6 +190,7 @@ function LinearCreateIssueForm(props: {
                   setWorkspaceId(value);
                   setTeamId(null);
                   setProjectId(NO_PROJECT);
+                  setCycleId(null);
                 }}
               >
                 <SelectTrigger size="sm" className="w-full" aria-label="Linear workspace">
@@ -203,6 +216,7 @@ function LinearCreateIssueForm(props: {
               onValueChange={(value) => {
                 setTeamId(value);
                 setProjectId(NO_PROJECT);
+                setCycleId(null);
               }}
             >
               <SelectTrigger size="sm" className="w-full" aria-label="Linear team">
@@ -234,6 +248,30 @@ function LinearCreateIssueForm(props: {
                 ))}
               </SelectPopup>
             </Select>
+            {cycles.length > 0 ? (
+              <Select
+                value={selectedCycleId}
+                onValueChange={(value) => setCycleId(value ?? NO_CYCLE)}
+              >
+                <SelectTrigger size="sm" className="w-full" aria-label="Linear cycle">
+                  <SelectValue>
+                    {selectedCycleId === NO_CYCLE
+                      ? "No cycle"
+                      : selectedCycle
+                        ? linearCycleLabel(selectedCycle)
+                        : "No cycle"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectPopup surface="settings">
+                  <SelectItem value={NO_CYCLE}>No cycle</SelectItem>
+                  {cycles.map((cycle) => (
+                    <SelectItem key={cycle.id} value={cycle.id}>
+                      {linearCycleLabel(cycle)}
+                    </SelectItem>
+                  ))}
+                </SelectPopup>
+              </Select>
+            ) : null}
           </form>
         </div>
       </DialogPanel>

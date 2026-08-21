@@ -5,6 +5,7 @@
 import {
   LINEAR_ISSUE_SEARCH_LIMIT,
   PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
+  type LinearCycle,
   type LinearCreateIssueInput,
   type LinearIssue,
   type LinearWorkspace,
@@ -40,6 +41,14 @@ interface RawIssue {
   readonly project?: { readonly name?: unknown } | null;
 }
 
+interface RawCycle {
+  readonly id?: unknown;
+  readonly number?: unknown;
+  readonly name?: unknown;
+  readonly startsAt?: unknown;
+  readonly endsAt?: unknown;
+}
+
 function text(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
@@ -59,6 +68,22 @@ function toIssue(raw: RawIssue, workspace: LinearWorkspace): LinearIssue | null 
     workspaceId: workspace.id,
     workspaceName: linearWorkspaceDisplayName(workspace),
     workspaceUrlKey: workspace.urlKey,
+  };
+}
+
+function toCycle(raw: RawCycle, isActive: boolean): LinearCycle | null {
+  const id = text(raw.id);
+  const number = typeof raw.number === "number" ? raw.number : Number.NaN;
+  const startsAt = text(raw.startsAt);
+  const endsAt = text(raw.endsAt);
+  if (!id || !Number.isFinite(number) || !startsAt || !endsAt) return null;
+  return {
+    id,
+    number,
+    name: typeof raw.name === "string" ? raw.name : null,
+    startsAt,
+    endsAt,
+    isActive,
   };
 }
 
@@ -192,7 +217,15 @@ export async function listLinearCreateOptions(
   const data = await linearGraphql(
     apiKey,
     `query {
-      teams(first: 100) { nodes { id key name } }
+      teams(first: 100) {
+        nodes {
+          id key name
+          activeCycle { id number name startsAt endsAt }
+          futureCycles: cycles(first: 15, filter: { isFuture: { eq: true } }) {
+            nodes { id number name startsAt endsAt }
+          }
+        }
+      }
       projects(first: 100) { nodes { id name teams(first: 25) { nodes { id } } } }
     }`,
     {},
@@ -202,11 +235,30 @@ export async function listLinearCreateOptions(
     ?.nodes;
   return {
     workspace,
-    teams: (teams ?? []).map((team) => ({
-      id: text(team.id),
-      key: text(team.key),
-      name: text(team.name),
-    })),
+    teams: (teams ?? []).map((team) => {
+      const activeCycle = team.activeCycle
+        ? toCycle(team.activeCycle as RawCycle, true)
+        : null;
+      const futureCycles = (
+        (team.futureCycles as { nodes?: ReadonlyArray<RawCycle> } | null)?.nodes ?? []
+      ).flatMap((cycle) => {
+        const parsed = toCycle(cycle, false);
+        return parsed ? [parsed] : [];
+      });
+      const cycles = [...(activeCycle ? [activeCycle] : []), ...futureCycles]
+        .filter((cycle, index, all) => all.findIndex((item) => item.id === cycle.id) === index)
+        .sort(
+          (left, right) =>
+            Number(right.isActive) - Number(left.isActive) ||
+            left.startsAt.localeCompare(right.startsAt),
+        );
+      return {
+        id: text(team.id),
+        key: text(team.key),
+        name: text(team.name),
+        cycles,
+      };
+    }),
     projects: (projects ?? []).map((project) => ({
       id: text(project.id),
       name: text(project.name),
@@ -323,6 +375,7 @@ export async function createLinearIssue(
         title: input.title,
         teamId: input.teamId,
         ...(input.projectId ? { projectId: input.projectId } : {}),
+        ...(input.cycleId ? { cycleId: input.cycleId } : {}),
         ...(input.description ? { description: input.description } : {}),
       },
     },

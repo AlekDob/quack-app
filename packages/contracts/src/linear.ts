@@ -34,10 +34,21 @@ export const LinearSearchIssuesInput = Schema.Struct({
 });
 export type LinearSearchIssuesInput = typeof LinearSearchIssuesInput.Type;
 
+export const LinearCycle = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  number: Schema.Number,
+  name: Schema.NullOr(Schema.String),
+  startsAt: Schema.String,
+  endsAt: Schema.String,
+  isActive: Schema.Boolean,
+});
+export type LinearCycle = typeof LinearCycle.Type;
+
 export const LinearTeam = Schema.Struct({
   id: TrimmedNonEmptyString,
   key: Schema.String,
   name: Schema.String,
+  cycles: Schema.Array(LinearCycle),
 });
 export type LinearTeam = typeof LinearTeam.Type;
 
@@ -65,6 +76,7 @@ export const LinearCreateIssueInput = Schema.Struct({
   title: TrimmedNonEmptyString.check(Schema.isMaxLength(256)),
   teamId: TrimmedNonEmptyString,
   projectId: Schema.optional(TrimmedNonEmptyString),
+  cycleId: Schema.optional(TrimmedNonEmptyString),
   // Markdown body. Pasted images are appended as `![name](assetUrl)` by the client.
   description: Schema.optional(TrimmedNonEmptyString.check(Schema.isMaxLength(16_000))),
 });

@@ -21,7 +21,7 @@ Deciso con l'utente:
 - Auth: API key personale in Settings → Linear, non OAuth. Più workspace = più key.
 - Il ticket vive nelle `mentions` del composer/messaggio, come file e chat. Nessuna colonna SQLite nuova.
 - Rinomina chat: `linearRenameChat` = `ask` (default) / `always` / `never`.
-- Nessuna scrittura di stato, assegnatario o branch su Linear.
+- Nessuna scrittura di stato, assegnatario o branch su Linear. Il dialog può assegnare il ciclo scelto.
 - Il MCP ufficiale Linear è dell'utente. Quack non lo wrappa, non lo spawn, non lo sovrascrive. Codex overlay tocca solo `[mcp_servers.synara]`. Claude carica Linear via `settingSources`. Cursor/Grok/Droid ricevono synara **più** i server del loro `mcp.json` nativo, mergiati: synara vince solo sulla chiave `synara`.
 
 Vedi [018-linear-project-routing.md](018-linear-project-routing.md) per il deep-link `quack://open?source=linear`. Indipendente da questa feature.
@@ -31,6 +31,8 @@ Vedi [018-linear-project-routing.md](018-linear-project-routing.md) per il deep-
 **2026-08-20 (descrizione + immagini):** il dialog "New Linear issue" ha un campo **Description** e permette di allegare immagini incollandole (Cmd+V), trascinandole o dal pulsante "Add image". Linear non ha un campo immagine su `issueCreate`: le immagini vengono caricate sul suo storage e appese al body come markdown `![nome](assetUrl)`, come fa Linear stesso. Upload al submit (non al paste) così annullare il dialog non lascia asset orfani; se un upload fallisce nessun ticket viene creato.
 
 **2026-08-21 (QUACK-6, titolo auto per ticket linkati):** quando il primo messaggio della chat contiene un *link* a un ticket Linear (URL `linear.app/.../issue/ESP-187/...` o mention `linear://.../ESP-187`) senza passare da "New Linear issue", il titolo auto-generato viene prefissato con l'identifier: `ESP-187 - <titolo>`. Nessuna chiamata API: l'identifier si estrae dall'URL/path già presente nel messaggio, il resto del titolo lo produce comunque il modello di text-generation. Se il titolo generato nomina già l'identifier, non viene duplicato.
+
+**2026-08-21 (cicli nella creazione):** il dialog "New Linear issue" carica il ciclo corrente e fino a 15 cicli futuri per il team. Se esiste un ciclo corrente parte già selezionato; l'utente può scegliere un ciclo futuro oppure "No cycle". Il ciclo non viene salvato nei default del progetto Quack. La mutation invia `cycleId` solo quando la scelta non è "No cycle".
 
 Diario: [2026-08-20](../diary/2026-08-20.md) (associazione Linear per progetto + disclosure UI); [2026-08-18](../diary/2026-08-18.md) (N workspace + MCP pass-through; chip + Environment + `@+`); [2026-08-14](../diary/2026-08-14.md) (prima integrazione, solo rinomina).
 
@@ -42,12 +44,12 @@ Diario: [2026-08-20](../diary/2026-08-20.md) (associazione Linear per progetto +
 | Logic      | `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts`            | `maybeGenerateAndRenameThreadTitleForFirstTurn` prefissa titolo generato/fallback con l'identifier trovato        |
 | Test       | `packages/shared/src/linearMentions.test.ts`                                | Round-trip slug/id; reject `plugin://linear`                                                                    |
 | Config     | `packages/shared/package.json`                                              | Export `@synara/shared/linearMentions`                                                                          |
-| Model/Type | `packages/contracts/src/linear.ts`                                          | `LinearWorkspace`, `LinearIssue` (+ workspace\*), create options per workspace                                  |
+| Model/Type | `packages/contracts/src/linear.ts`                                          | `LinearWorkspace`, `LinearIssue`, `LinearCycle`, create options per workspace/team                            |
 | Model/Type | `packages/contracts/src/settings.ts`                                        | `linear.workspaces[]`, `apiKeyConfigured`, patch `apiKey` / `removeWorkspaceId`                                 |
 | Contratti  | `packages/contracts/src/ws.ts`, `rpc.ts`, `ipc.ts`                          | `linear.searchIssues`, `linear.listCreateOptions`, `linear.createIssue`                                         |
 | Service    | `apps/server/src/linear/linearCredentials.ts`                               | Secret `linear-api-key:<orgId>`; legacy `linear-api-key`                                                        |
 | Service    | `apps/server/src/linear/linearWorkspaces.ts`                                | Add/remove/migrate workspace; cap 8                                                                             |
-| Service    | `apps/server/src/linear/linearClient.ts`                                    | GraphQL search/create + org lookup (`organization` / `viewer.organization`); fan-out search; `uploadLinearFile` |
+| Service    | `apps/server/src/linear/linearClient.ts`                                    | GraphQL search/create/cycles + org lookup (`organization` / `viewer.organization`); fan-out search; `uploadLinearFile` |
 | Route      | `apps/server/src/http.ts`                                                   | Branch `/api/linear/upload` in `binaryUploadEffectHandler` (byte grezzi → assetUrl)                             |
 | Config     | `packages/shared/src/binaryTransfer.ts`                                     | `LINEAR_UPLOAD_ROUTE_PATH`                                                                                      |
 | Util       | `apps/web/src/lib/linearIssueDescription.ts`                                | `buildLinearIssueDescription` — body + `![nome](assetUrl)`                                                      |
@@ -67,7 +69,7 @@ Diario: [2026-08-20](../diary/2026-08-20.md) (associazione Linear per progetto +
 | Component  | `apps/web/src/components/chat/MentionChipIcon.tsx`                          | Icona Linear su chip composer/messaggio                                                                         |
 | Component  | `apps/web/src/components/chat/InlineMentionChip.tsx`                        | Label = nome; click apre Linear                                                                                 |
 | Component  | `apps/web/src/components/composer-nodes/index.tsx`                          | Label chip Lexical per kind `linear`                                                                            |
-| Component  | `apps/web/src/components/chat/LinearCreateIssueDialog.tsx`                  | Workspace (se >1) + team + progetto; legge i default del project al mount                                       |
+| Component  | `apps/web/src/components/chat/LinearCreateIssueDialog.tsx`                  | Workspace (se >1) + team + progetto + ciclo; legge i default del project al mount                            |
 | Component  | `apps/web/src/components/ChatView.tsx`                                      | Insert mention, Ask/Always/Never, Environment mentions, passa `projectId` al dialog create                      |
 | Component  | `apps/web/src/components/ProjectSettingsDialog.tsx`                         | Campi team/progetto Linear per progetto, dietro disclosure "Linear (optional)"                                  |
 | Component  | `apps/web/src/components/Sidebar.tsx`                                       | Passa `projectId` a `ProjectSettingsDialog`                                                                     |
@@ -96,7 +98,7 @@ Pick issue → token `formatComposerMentionToken(name)` + mention `{ name, path:
 
 `@+` / `@+Kanban` → `linearComposerCreateQuery` → create come prima voce; search Linear usa il testo dopo `+`.
 
-"New Linear issue" → dialog (titolo, descrizione, immagini, workspace se >1, team, progetto). Al Create: upload sequenziale delle immagini su `/api/linear/upload` (una alla volta, mai burst di body concorrenti) → `buildLinearIssueDescription` → `linear.createIssue` → stesso insert chip + policy rinomina. Team/progetto iniziali: default salvato per il project attivo, letto nell'initializer `useState` del form (al mount), altrimenti primo team disponibile.
+"New Linear issue" → dialog (titolo, descrizione, immagini, workspace se >1, team, progetto, ciclo). I cicli arrivano dal team: corrente più futuri, con il corrente pre-selezionato quando presente. Al Create: upload sequenziale delle immagini su `/api/linear/upload` (una alla volta, mai burst di body concorrenti) → `buildLinearIssueDescription` → `linear.createIssue` con `cycleId` opzionale → stesso insert chip + policy rinomina. Team/progetto iniziali: default salvato per il project attivo, letto nell'initializer `useState` del form (al mount), altrimenti primo team disponibile.
 
 Edit project → disclosure "Linear (optional)" → scegli team (filtra progetti per team) → `writeProjectLinearDefaults(projectId, …)` al Save. `null` (nessun team) rimuove l'associazione.
 
@@ -125,6 +127,7 @@ Agenti: Codex overlay copia `config.toml` e sostituisce solo synara. Claude `set
 - `uploadLinearFile(apiKey, { name, mimeType, bytes }) → assetUrl` — prepare `fileUpload` + PUT firmato
 - `buildLinearIssueDescription(text, images) → string` — body markdown, salta le parti vuote
 - `uploadLinearImage({ workspaceId, file }) → assetUrl` — client web, byte grezzi via HTTP
+- `listLinearCreateOptions(apiKey, workspace) → { workspace, teams, projects }` — team con ciclo corrente e futuri già ordinati
 
 ### State
 
@@ -175,6 +178,6 @@ API key solo nel secret store (`~/.synara/userdata/secrets/`, 0600). `settings.j
 - Nessun tool `synara_linear_*`.
 - Nessuna scrittura nei file MCP dell'utente.
 - Nessuna colonna su `projection_threads`.
-- Nessuna scrittura stato/assegnatario/branch su Linear.
+- Nessuna scrittura stato/assegnatario/branch su Linear; il ciclo è scritto solo se scelto nel dialog.
 - Nessun gruppo sidebar di thread Linear.
 - Nessuna gestione OAuth di `mcp.linear.app`.

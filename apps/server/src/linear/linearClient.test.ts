@@ -7,6 +7,7 @@ import {
   createLinearIssue,
   fetchLinearOrganization,
   LinearApiError,
+  listLinearCreateOptions,
   searchLinearIssues,
   searchLinearIssuesAcrossWorkspaces,
   uploadLinearFile,
@@ -136,6 +137,119 @@ describe("linearClient", () => {
     });
 
     await expect(fetchLinearOrganization("key")).resolves.toEqual(WORKSPACE);
+  });
+
+  it("lists the active cycle before sorted future cycles and keeps teams without cycles", async () => {
+    reply({
+      data: {
+        teams: {
+          nodes: [
+            {
+              id: "team-1",
+              key: "ALE",
+              name: "Quack",
+              activeCycle: {
+                id: "cycle-current",
+                number: 12,
+                name: "Current work",
+                startsAt: "2026-08-10T00:00:00.000Z",
+                endsAt: "2026-08-24T00:00:00.000Z",
+              },
+              futureCycles: {
+                nodes: [
+                  {
+                    id: "cycle-14",
+                    number: 14,
+                    name: null,
+                    startsAt: "2026-09-07T00:00:00.000Z",
+                    endsAt: "2026-09-21T00:00:00.000Z",
+                  },
+                  {
+                    id: "cycle-current",
+                    number: 12,
+                    name: "Duplicate",
+                    startsAt: "2026-08-10T00:00:00.000Z",
+                    endsAt: "2026-08-24T00:00:00.000Z",
+                  },
+                  {
+                    id: "cycle-13",
+                    number: 13,
+                    name: "Next",
+                    startsAt: "2026-08-24T00:00:00.000Z",
+                    endsAt: "2026-09-07T00:00:00.000Z",
+                  },
+                ],
+              },
+            },
+            {
+              id: "team-2",
+              key: "OPS",
+              name: "Operations",
+              activeCycle: null,
+              futureCycles: { nodes: [] },
+            },
+          ],
+        },
+        projects: { nodes: [] },
+      },
+    });
+
+    const options = await listLinearCreateOptions("key", WORKSPACE);
+
+    expect(options.teams[0]?.cycles).toEqual([
+      {
+        id: "cycle-current",
+        number: 12,
+        name: "Current work",
+        startsAt: "2026-08-10T00:00:00.000Z",
+        endsAt: "2026-08-24T00:00:00.000Z",
+        isActive: true,
+      },
+      {
+        id: "cycle-13",
+        number: 13,
+        name: "Next",
+        startsAt: "2026-08-24T00:00:00.000Z",
+        endsAt: "2026-09-07T00:00:00.000Z",
+        isActive: false,
+      },
+      {
+        id: "cycle-14",
+        number: 14,
+        name: null,
+        startsAt: "2026-09-07T00:00:00.000Z",
+        endsAt: "2026-09-21T00:00:00.000Z",
+        isActive: false,
+      },
+    ]);
+    expect(options.teams[1]?.cycles).toEqual([]);
+    expect(lastBody().query).toContain("cycles(first: 15");
+    expect(lastBody().query).toContain("isFuture: { eq: true }");
+  });
+
+  it("sends the selected cycle when creating an issue", async () => {
+    reply({ data: { issueCreate: { success: true, issue: ISSUE_NODE } } });
+
+    await createLinearIssue("key", WORKSPACE, {
+      workspaceId: "org-1",
+      title: "x",
+      teamId: "team-1",
+      cycleId: "cycle-current",
+    });
+
+    expect(lastBody().variables.input).toMatchObject({ cycleId: "cycle-current" });
+  });
+
+  it("omits the cycle when none is selected", async () => {
+    reply({ data: { issueCreate: { success: true, issue: ISSUE_NODE } } });
+
+    await createLinearIssue("key", WORKSPACE, {
+      workspaceId: "org-1",
+      title: "x",
+      teamId: "team-1",
+    });
+
+    expect(lastBody().variables.input).not.toHaveProperty("cycleId");
   });
 
   describe("uploadLinearFile", () => {
