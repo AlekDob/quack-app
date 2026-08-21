@@ -11,8 +11,9 @@ import {
 } from "./composerPickerStyles";
 
 /** Insets a status banner to the transcript column width with the shared top gutter,
- *  so error / provider-health / rate-limit banners line up with the transcript and
- *  composer column instead of each re-declaring the same two-div wrapper. */
+ *  so thread-error / rate-limit banners line up with the transcript and composer column
+ *  instead of each re-declaring the same two-div wrapper. Provider health renders above
+ *  the composer instead (see ProviderHealthBanner). */
 export function ChatColumnBannerFrame({
   children,
   className,

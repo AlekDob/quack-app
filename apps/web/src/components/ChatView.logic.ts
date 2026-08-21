@@ -287,6 +287,13 @@ export function shouldRenderProviderHealthBanner(input: {
   return input.threadEntryPoint === "chat" && !input.terminalWorkspaceTerminalTabActive;
 }
 
+/** Prefer the composer-adjacent provider banner over a top toast when that banner can show. */
+export function shouldToastProviderSendBlock(input: {
+  shouldShowProviderHealthBanner: boolean;
+}): boolean {
+  return !input.shouldShowProviderHealthBanner;
+}
+
 // Big-paste cards are sent only by the normal chat path; non-chat composer flows
 // read plain editor text, so they must let Lexical insert pasted text normally.
 export function shouldEnableComposerPastedTextCollapse(input: {

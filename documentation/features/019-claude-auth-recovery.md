@@ -3,7 +3,7 @@ type: feature-doc
 project: synara
 stack: React / TypeScript
 created: 2026-08-11
-last_verified: 2026-08-12
+last_verified: 2026-08-21
 status: active
 tags: [claude-agent, auth, recovery, terminal, transcript]
 ---
@@ -55,6 +55,11 @@ tags: [claude-agent, auth, recovery, terminal, transcript]
 ### Out of scope (deliberately not built)
 
 - Recovery for other providers' auth failures (Codex, Grok, etc.) — this card is Claude-Agent-specific.
+- Pre-send / live provider status for any provider (including Claude before a failed turn) — see [028-provider-health-banner.md](028-provider-health-banner.md) (composer-adjacent banner; QUACK-5).
+
+### Related (2026-08-21)
+
+- Composer-adjacent provider health banner placement + dark contrast: [028-provider-health-banner.md](028-provider-health-banner.md).
 
 ### Vincoli React Compiler (2026-08-12)
 

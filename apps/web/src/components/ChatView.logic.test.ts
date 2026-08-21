@@ -57,6 +57,7 @@ import {
   shouldEnableComposerPastedTextCollapse,
   shouldHandlePromptHistoryNavigationKey,
   shouldRenderProviderHealthBanner,
+  shouldToastProviderSendBlock,
   shouldShowComposerModelBootstrapSkeleton,
   shouldStartActiveTurnLayoutGrace,
   shouldRenderTerminalWorkspace,
@@ -1664,6 +1665,16 @@ describe("shouldRenderProviderHealthBanner", () => {
         terminalWorkspaceTerminalTabActive: false,
       }),
     ).toBe(true);
+  });
+});
+
+describe("shouldToastProviderSendBlock", () => {
+  it("skips the top toast when the composer provider banner can show", () => {
+    expect(shouldToastProviderSendBlock({ shouldShowProviderHealthBanner: true })).toBe(false);
+  });
+
+  it("keeps the top toast when the composer provider banner cannot show", () => {
+    expect(shouldToastProviderSendBlock({ shouldShowProviderHealthBanner: false })).toBe(true);
   });
 });
 

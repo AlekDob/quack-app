@@ -13,10 +13,12 @@ const alertVariants = cva(
     variants: {
       variant: {
         default: "bg-transparent dark:bg-input/32 [&>svg]:text-muted-foreground",
-        error: "border-destructive/32 bg-destructive/4 [&>svg]:text-destructive",
+        error:
+          "border-destructive/40 bg-destructive/8 [&>svg]:text-destructive dark:border-destructive/55 dark:bg-destructive/16",
         info: "border-info/32 bg-info/4 [&>svg]:text-info",
         success: "border-success/32 bg-success/4 [&>svg]:text-success",
-        warning: "border-warning/32 bg-warning/4 [&>svg]:text-warning",
+        warning:
+          "border-warning/40 bg-warning/8 [&>svg]:text-warning dark:border-warning/55 dark:bg-warning/16",
       },
       size: {
         default: "px-3.5 py-3 text-sm",

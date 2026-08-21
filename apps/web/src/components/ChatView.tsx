@@ -637,6 +637,7 @@ import {
   type QueuedSteerGate,
   resolveQueuedSteerGateTransition,
   shouldRenderProviderHealthBanner,
+  shouldToastProviderSendBlock,
   resolveRuntimeModeAfterApprovalDecision,
   revokeBlobPreviewUrl,
   savePaperoInstructionsFailure,
@@ -7526,10 +7527,21 @@ export default function ChatView({
           return false;
         }
       } else {
-        toastManager.add({
-          type: "error",
-          title: sendProviderAvailability.unavailableReason,
-        });
+        if (activeProviderHealthBannerDismissalKey) {
+          setDismissedProviderHealthBannerKeys((current) =>
+            current.filter((key) => key !== activeProviderHealthBannerDismissalKey),
+          );
+        }
+        if (
+          shouldToastProviderSendBlock({
+            shouldShowProviderHealthBanner,
+          })
+        ) {
+          toastManager.add({
+            type: "error",
+            title: sendProviderAvailability.unavailableReason,
+          });
+        }
         return false;
       }
     }
@@ -11158,6 +11170,12 @@ export default function ChatView({
           data-chat-pane-scope={paneScopeId}
         >
           <ComposerColumnFrame>
+            {shouldShowProviderHealthBanner ? (
+              <ProviderHealthBanner
+                status={visibleActiveProviderStatus}
+                onDismiss={dismissActiveProviderHealthBanner}
+              />
+            ) : null}
             {/* A bare wrapper keeps the normal-flow panels' -mb-px seam onto the input shell
                 via margin collapse. */}
             <div>
@@ -11896,11 +11914,8 @@ export default function ChatView({
         />
       ) : null}
 
-      {/* Error banner */}
-      <ProviderHealthBanner
-        status={shouldShowProviderHealthBanner ? visibleActiveProviderStatus : null}
-        onDismiss={dismissActiveProviderHealthBanner}
-      />
+      {/* Thread / rate-limit banners stay at the top of the pane; provider health
+          renders above the composer so send-blocking auth errors land near the input. */}
       {!hasClaudeAuthRecovery ? (
         <ThreadErrorBanner
           error={activeThread.error}
