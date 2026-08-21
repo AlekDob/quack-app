@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  findLinearIssueIdentifier,
   identifierFromLinearMentionPath,
   isLinearMentionPath,
   linearIssueWebUrlForIdentifier,
@@ -8,6 +9,7 @@ import {
   linearMentionPathForIdentifier,
   linearWorkspaceDisplayName,
   parseLinearMentionPath,
+  withLinearIssueTitlePrefix,
 } from "./linearMentions";
 
 describe("linear mention paths", () => {
@@ -49,5 +51,40 @@ describe("linear mention paths", () => {
     expect(linearWorkspaceDisplayName({ name: "Alek", label: "Casa" })).toBe("Casa");
     expect(linearWorkspaceDisplayName({ name: "Alek", label: "  " })).toBe("Alek");
     expect(linearWorkspaceDisplayName({ name: "Alek" })).toBe("Alek");
+  });
+});
+
+describe("linear issue title prefix", () => {
+  const identifier = (text: string) => findLinearIssueIdentifier(text);
+
+  it("pulls the identifier from a pasted issue URL", () => {
+    expect(
+      identifier("https://linear.app/wacebo-europe/issue/ESP-187/staff-utente-wacebo - fix it"),
+    ).toBe("ESP-187");
+  });
+
+  it("pulls the identifier from a mention path", () => {
+    expect(identifier("see linear://wacebo-europe/ESP-187 please")).toBe("ESP-187");
+  });
+
+  it("ignores text without a linear reference", () => {
+    expect(identifier("bump GPT-5 usage")).toBeNull();
+  });
+
+  it("prefixes the generated title", () => {
+    expect(withLinearIssueTitlePrefix("Fix staff sync", "ESP-187")).toBe(
+      "ESP-187 - Fix staff sync",
+    );
+  });
+
+  it("does not repeat an identifier the title already names", () => {
+    expect(withLinearIssueTitlePrefix("ESP-187: fix staff sync", "ESP-187")).toBe(
+      "ESP-187 - fix staff sync",
+    );
+    expect(withLinearIssueTitlePrefix("ESP-187", "ESP-187")).toBe("ESP-187");
+  });
+
+  it("leaves the title alone without an identifier", () => {
+    expect(withLinearIssueTitlePrefix("Fix staff sync", null)).toBe("Fix staff sync");
   });
 });

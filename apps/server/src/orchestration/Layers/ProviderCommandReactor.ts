@@ -46,6 +46,10 @@ import {
   isGenericChatThreadTitle,
 } from "@synara/shared/chatThreads";
 import {
+  findLinearIssueIdentifier,
+  withLinearIssueTitlePrefix,
+} from "@synara/shared/linearMentions";
+import {
   collectTailTurnIds,
   resolveTailUserMessageEditTarget,
 } from "@synara/shared/conversationEdit";
@@ -2032,6 +2036,7 @@ const make = Effect.gen(function* () {
     const thread = yield* resolveFirstTurnThread(input.threadId, input.messageId);
     if (!thread) return;
 
+    const linearIdentifier = findLinearIssueIdentifier(input.messageText);
     const fallbackTitle = buildPromptThreadTitleFallback(
       input.messageText.trim() || attachmentTitleSeed(input.attachments?.[0]) || "",
     );
@@ -2052,7 +2057,7 @@ const make = Effect.gen(function* () {
           type: "thread.meta.update",
           commandId: serverCommandId("thread-title-fallback-rename"),
           threadId: input.threadId,
-          title: fallbackTitle,
+          title: withLinearIssueTitlePrefix(fallbackTitle, linearIdentifier),
         });
       }
       return;
@@ -2083,12 +2088,12 @@ const make = Effect.gen(function* () {
         : {}),
     };
     const nextTitle = yield* textGeneration.generateThreadTitle(titleGenerationInput).pipe(
-      Effect.map((generated) => generated.title),
+      Effect.map((generated) => withLinearIssueTitlePrefix(generated.title, linearIdentifier)),
       Effect.catch((error) =>
         Effect.logWarning("provider command reactor failed to generate thread title", {
           ...textGenerationLogContext,
           reason: error.message,
-        }).pipe(Effect.as(fallbackTitle)),
+        }).pipe(Effect.as(withLinearIssueTitlePrefix(fallbackTitle, linearIdentifier))),
       ),
     );
 

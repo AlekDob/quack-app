@@ -5,7 +5,7 @@ stack: Effect / Node.js / React (Vite) / TypeScript
 created: 2026-08-14
 startDate: 2026-08-14
 endDate:
-last_verified: 2026-08-20
+last_verified: 2026-08-21
 status: active
 tags: [linear, composer, mention, settings, secrets, websocket, environment, mcp]
 ---
@@ -30,13 +30,16 @@ Vedi [018-linear-project-routing.md](018-linear-project-routing.md) per il deep-
 
 **2026-08-20 (descrizione + immagini):** il dialog "New Linear issue" ha un campo **Description** e permette di allegare immagini incollandole (Cmd+V), trascinandole o dal pulsante "Add image". Linear non ha un campo immagine su `issueCreate`: le immagini vengono caricate sul suo storage e appese al body come markdown `![nome](assetUrl)`, come fa Linear stesso. Upload al submit (non al paste) così annullare il dialog non lascia asset orfani; se un upload fallisce nessun ticket viene creato.
 
+**2026-08-21 (QUACK-6, titolo auto per ticket linkati):** quando il primo messaggio della chat contiene un *link* a un ticket Linear (URL `linear.app/.../issue/ESP-187/...` o mention `linear://.../ESP-187`) senza passare da "New Linear issue", il titolo auto-generato viene prefissato con l'identifier: `ESP-187 - <titolo>`. Nessuna chiamata API: l'identifier si estrae dall'URL/path già presente nel messaggio, il resto del titolo lo produce comunque il modello di text-generation. Se il titolo generato nomina già l'identifier, non viene duplicato.
+
 Diario: [2026-08-20](../diary/2026-08-20.md) (associazione Linear per progetto + disclosure UI); [2026-08-18](../diary/2026-08-18.md) (N workspace + MCP pass-through; chip + Environment + `@+`); [2026-08-14](../diary/2026-08-14.md) (prima integrazione, solo rinomina).
 
 ### Files
 
 | Type       | Path                                                                        | Exports/Purpose                                                                                                 |
 | ---------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Util       | `packages/shared/src/linearMentions.ts`                                     | `linear://alekdob/ALE-22` + fallback `linear://ALE-22`                                                          |
+| Util       | `packages/shared/src/linearMentions.ts`                                     | `linear://alekdob/ALE-22` + fallback `linear://ALE-22`; `findLinearIssueIdentifier` / `withLinearIssueTitlePrefix` |
+| Logic      | `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts`            | `maybeGenerateAndRenameThreadTitleForFirstTurn` prefissa titolo generato/fallback con l'identifier trovato        |
 | Test       | `packages/shared/src/linearMentions.test.ts`                                | Round-trip slug/id; reject `plugin://linear`                                                                    |
 | Config     | `packages/shared/package.json`                                              | Export `@synara/shared/linearMentions`                                                                          |
 | Model/Type | `packages/contracts/src/linear.ts`                                          | `LinearWorkspace`, `LinearIssue` (+ workspace\*), create options per workspace                                  |
@@ -115,6 +118,8 @@ Agenti: Codex overlay copia `config.toml` e sostituisce solo synara. Claude `set
 - `mergeAcpMcpServers(user, synara) → Acp.McpServer[]` — synara vince solo sul name `synara`
 - `loadUserAcpMcpServers({ provider, cwd }) → Acp.McpServer[]` — file assenti = lista vuota
 - `linearWorkspaceDisplayName(workspace) → string` — `label` utente, altrimenti nome org Linear
+- `findLinearIssueIdentifier(text) → string | null` — estrae `ESP-187` da URL `linear.app/.../issue/...` o mention `linear://...`
+- `withLinearIssueTitlePrefix(title, identifier) → string` — `"ESP-187 - <title>"`, senza duplicarlo se già presente
 - `readProjectLinearDefaults(projectId) → { workspaceId, teamId, projectId } | null` — null se manca team o non c'è entry
 - `writeProjectLinearDefaults(projectId, value | null) → void` — `null` cancella l'entry
 - `uploadLinearFile(apiKey, { name, mimeType, bytes }) → assetUrl` — prepare `fileUpload` + PUT firmato

@@ -3,7 +3,8 @@
 // Layer: Shared runtime utilities (consumed by both server and web)
 // Exports: LINEAR_MENTION_PATH_PREFIX, isLinearMentionPath, linearMentionPathForIdentifier,
 //          parseLinearMentionPath, identifierFromLinearMentionPath, linearIssueWebUrlForIdentifier,
-//          linearMentionNameFromIssue, linearWorkspaceDisplayName
+//          linearMentionNameFromIssue, linearWorkspaceDisplayName, findLinearIssueIdentifier,
+//          withLinearIssueTitlePrefix
 
 export const LINEAR_MENTION_PATH_PREFIX = "linear://";
 
@@ -62,4 +63,24 @@ export function linearWorkspaceDisplayName(workspace: {
 }): string {
   const label = workspace.label?.trim() ?? "";
   return label.length > 0 ? label : workspace.name;
+}
+
+// A linked (not created) Linear ticket should still show up as "ESP-187 - ..." in the
+// thread title, so we pull the identifier out of the pasted URL or the mention path.
+const LINEAR_URL_ISSUE_RE = /linear\.app\/[^/\s]+\/issue\/([A-Za-z][A-Za-z0-9]*-\d+)/i;
+const LINEAR_MENTION_RE = /linear:\/\/(?:[^/\s]+\/)?([A-Za-z][A-Za-z0-9]*-\d+)/i;
+
+export function findLinearIssueIdentifier(text: string): string | null {
+  const match = LINEAR_URL_ISSUE_RE.exec(text) ?? LINEAR_MENTION_RE.exec(text);
+  return match?.[1]?.toUpperCase() ?? null;
+}
+
+/** Puts the ticket number first, without repeating it if the title already names it. */
+export function withLinearIssueTitlePrefix(title: string, identifier: string | null): string {
+  if (!identifier) return title;
+  const stripped = title
+    .replace(new RegExp(`\\b${identifier}\\b[\\s:–—-]*`, "gi"), "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return stripped.length > 0 ? `${identifier} - ${stripped}` : identifier;
 }
