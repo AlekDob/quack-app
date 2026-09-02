@@ -22,13 +22,14 @@ Quack already asks the SDK for its model list (`ClaudeAdapter.listModels` → `s
 
 ### Files
 
-| Type   | Path                                                          | Exports/Purpose                                                                                          |
-| ------ | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Adapter | `apps/server/src/provider/Layers/ClaudeAdapter.ts`            | `mapClaudeModelInfo` — now carries `description`, `supportedReasoningEfforts`, `supportsFastMode` through to `ProviderListModelsResult` |
-| Logic  | `apps/web/src/components/chat/runtimeModelCapabilities.ts`     | `getRuntimeAwareModelCapabilities` — `claudeAgent` now reads effort/fast-mode from the runtime descriptor; re-appends the Quack-only modes (`ultrathink`, `ultracode`) the CLI never lists |
-| Test   | `apps/web/src/components/chat/runtimeModelCapabilities.test.ts` | Covers an unknown Claude slug getting its ladder from runtime discovery while keeping `ultracode` and auto-compact |
-| Shared | `packages/shared/src/model.ts`                                  | `getModelCapabilities` — an unrecognized `claude-*` slug falls back to Opus 5's static capabilities (auto-compact window options, ultracode) instead of `EMPTY_MODEL_CAPABILITIES` |
-| Test   | `apps/server/src/provider/Layers/ClaudeAdapter.test.ts`         | `discovers Claude model capabilities before a session starts` — asserts the richer `ProviderListModelsResult` shape |
+| Type    | Path                                                            | Exports/Purpose                                                                                                                                                                            |
+| ------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Adapter | `apps/server/src/provider/Layers/ClaudeAdapter.ts`              | `mapClaudeModelInfo` — now carries `description`, `supportedReasoningEfforts`, `supportsFastMode` through to `ProviderListModelsResult`                                                    |
+| Logic   | `apps/web/src/components/chat/runtimeModelCapabilities.ts`      | `getRuntimeAwareModelCapabilities` — `claudeAgent` now reads effort/fast-mode from the runtime descriptor; re-appends the Quack-only modes (`ultrathink`, `ultracode`) the CLI never lists |
+| Test    | `apps/web/src/components/chat/runtimeModelCapabilities.test.ts` | Covers an unknown Claude slug getting its ladder from runtime discovery while keeping `ultracode` and auto-compact                                                                         |
+| Logic   | `apps/web/src/providerModelOptions.ts`                          | `mergeDynamicModelOptions` — for `claudeAgent`, normalizes on the runtime `resolvedModel` (version-explicit) and derives the label from the slug, so a point release is its own entry      |
+| Shared  | `packages/shared/src/model.ts`                                  | `getModelCapabilities` — an unrecognized `claude-*` slug falls back to Opus 5's static capabilities (auto-compact window options, ultracode) instead of `EMPTY_MODEL_CAPABILITIES`         |
+| Test    | `apps/server/src/provider/Layers/ClaudeAdapter.test.ts`         | `discovers Claude model capabilities before a session starts` — asserts the richer `ProviderListModelsResult` shape                                                                        |
 
 ### Data Flow
 
@@ -43,6 +44,7 @@ Quack already asks the SDK for its model list (`ClaudeAdapter.listModels` → `s
 ### Behavior
 
 - A newly released first-party Claude model (`claude-*` slug) shows up in the picker with a working effort ladder and correct fast-mode support as soon as the installed Claude CLI/SDK knows about it — no Quack release required.
+- A generic runtime alias (`fable`, `opus`, `sonnet`) no longer collapses onto the previous static version: `resolvedModel` decides the slug, so `fable` → `claude-fable-5-1` shows as "Claude Fable 5.1" alongside the older `claude-fable-5` built-in.
 - User-defined custom slugs with a provider prefix (`claude/my-model`) deliberately keep `EMPTY_MODEL_CAPABILITIES` as the static fallback — nothing is forced onto an arbitrary runtime.
 - Ultrathink (prompt-prefix mode) and Ultracode (provider-setting mode) are Quack-side conventions the CLI never lists; they're preserved by re-appending the static entries that declare `controlSource: "prompt-prefix"` or `"provider-setting"`.
 

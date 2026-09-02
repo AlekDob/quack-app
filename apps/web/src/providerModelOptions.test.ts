@@ -104,6 +104,27 @@ describe("mergeDynamicModelOptions", () => {
     ).toEqual(["anthropic/claude-fable-5", "anthropic/claude-opus-4-8"]);
   });
 
+  it("keeps a new Claude point release distinct from the previous version", () => {
+    expect(
+      mergeDynamicModelOptions({
+        provider: "claudeAgent",
+        staticOptions: [
+          { slug: "claude-fable-5", name: "Claude Fable 5" },
+          { slug: "claude-opus-5", name: "Claude Opus 5" },
+        ],
+        dynamicModels: [
+          { slug: "default", resolvedModel: "claude-opus-5[1m]", name: "Default (recommended)" },
+          { slug: "opus[1m]", resolvedModel: "claude-opus-5[1m]", name: "Opus (1M context)" },
+          { slug: "fable", resolvedModel: "claude-fable-5-1[1m]", name: "Fable" },
+        ],
+      }).map((option) => `${option.slug}|${option.name}`),
+    ).toEqual([
+      "claude-fable-5-1|Claude Fable 5.1",
+      "claude-opus-5|Claude Opus 5",
+      "claude-fable-5|Claude Fable 5",
+    ]);
+  });
+
   it("uses the live Antigravity catalog as authoritative and includes newly discovered models", () => {
     expect(
       mergeDynamicModelOptions({

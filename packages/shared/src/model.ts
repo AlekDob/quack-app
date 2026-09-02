@@ -101,7 +101,10 @@ export function humanizeModelSlug(slug: string): string {
   if (slug.includes("/")) {
     return slug;
   }
-  return slug.replace(/[-_]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  // Claude ships point releases as extra slug segments (claude-fable-5-1), so the
+  // trailing version pair reads as a decimal instead of two separate words.
+  const dotted = slug.startsWith("claude-") ? slug.replace(/-(\d+)-(\d+)$/u, "-$1.$2") : slug;
+  return dotted.replace(/[-_]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 export function formatModelDisplayName(model: string | null | undefined): string | undefined {

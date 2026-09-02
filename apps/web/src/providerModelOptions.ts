@@ -88,6 +88,7 @@ export function mergeDynamicModelOptions(input: {
   staticOptions: ReadonlyArray<ProviderModelOption & { isCustom?: boolean }>;
   dynamicModels: ReadonlyArray<{
     slug: string;
+    resolvedModel?: string | null | undefined;
     name?: string | null | undefined;
     description?: string | null | undefined;
     upstreamProviderId?: string | null | undefined;
@@ -109,7 +110,14 @@ export function mergeDynamicModelOptions(input: {
       continue;
     }
 
-    const normalizedSlug = normalizeDynamicModelSlug(input.provider, dynamicModel.slug);
+    // Claude reports generic aliases ("fable", "opus") whose meaning moves with
+    // every CLI release; resolvedModel is the version-explicit id, so a new
+    // point release shows up as itself instead of collapsing onto last version.
+    const slugSource =
+      input.provider === "claudeAgent" && dynamicModel.resolvedModel?.trim()
+        ? dynamicModel.resolvedModel.trim()
+        : dynamicModel.slug;
+    const normalizedSlug = normalizeDynamicModelSlug(input.provider, slugSource);
     const rawSlug = dynamicModel.slug.trim().toLowerCase();
     const displayNameFallback = formatProviderModelOptionName({
       provider: input.provider,
@@ -123,7 +131,8 @@ export function mergeDynamicModelOptions(input: {
       slug: normalizedSlug,
       name:
         staticNameBySlug.get(normalizedSlug) ??
-        (rawName.length > 0 &&
+        (input.provider !== "claudeAgent" &&
+        rawName.length > 0 &&
         rawName.toLowerCase() !== rawSlug &&
         rawName.toLowerCase() !== normalizedSlug.toLowerCase()
           ? rawName
