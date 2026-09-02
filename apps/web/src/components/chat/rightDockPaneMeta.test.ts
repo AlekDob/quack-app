@@ -42,6 +42,7 @@ describe("resolveRightDockLauncherItems", () => {
       ["terminal", "Terminal"],
       ["browser", "Browser"],
       ["explorer", "Files"],
+      ["map", "Map"],
       ["sidechat", "Side chats"],
     ]);
   });
@@ -53,7 +54,7 @@ describe("resolveRightDockLauncherItems", () => {
         hasGitRepository: true,
         hasReview: true,
       }).map(({ kind }) => kind),
-    ).toEqual(["diff", "terminal", "browser", "explorer", "sidechat", "git"]);
+    ).toEqual(["diff", "terminal", "browser", "explorer", "map", "sidechat", "git"]);
   });
 
   it("hides workspace-backed tools while no workspace is ready", () => {
@@ -73,7 +74,7 @@ describe("resolveRightDockLauncherItems", () => {
         hasGitRepository: true,
         hasReview: false,
       }).map(({ kind }) => kind),
-    ).toEqual(["terminal", "browser", "explorer", "sidechat", "git"]);
+    ).toEqual(["terminal", "browser", "explorer", "map", "sidechat", "git"]);
   });
 
   it("offers the simulator only when the server can host one", () => {
@@ -86,7 +87,7 @@ describe("resolveRightDockLauncherItems", () => {
         hasReview: false,
         hasDeviceSupport: true,
       }).map(({ kind }) => kind),
-    ).toEqual(["terminal", "browser", "explorer", "sidechat", "device"]);
+    ).toEqual(["terminal", "browser", "explorer", "map", "sidechat", "device"]);
 
     expect(
       resolveRightDockLauncherItems({

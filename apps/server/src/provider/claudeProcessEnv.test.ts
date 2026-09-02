@@ -191,4 +191,12 @@ describe("claudeProcessEnv", () => {
       "/home/tester/.claude/.credentials.json",
     ]);
   });
+
+  it("keeps native tools loaded unless the caller overrides tool search", () => {
+    assert.strictEqual(buildClaudeProcessEnv({ env: {} }).ENABLE_TOOL_SEARCH, "auto:100");
+    assert.strictEqual(
+      buildClaudeProcessEnv({ env: { ENABLE_TOOL_SEARCH: "true" } }).ENABLE_TOOL_SEARCH,
+      "true",
+    );
+  });
 });

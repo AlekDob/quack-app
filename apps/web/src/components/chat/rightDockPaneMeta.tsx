@@ -17,6 +17,7 @@ import {
   InfoIcon,
   MessageCircleIcon,
   TerminalIcon,
+  WorkflowIcon,
 } from "~/lib/icons";
 import {
   RIGHT_DOCK_PANE_KINDS,
@@ -43,6 +44,7 @@ export const RIGHT_DOCK_PANE_META: Record<RightDockPaneKind, RightDockPaneMeta> 
   device: { label: "iOS Simulator", Icon: DeviceMobileIcon },
   diff: { label: "Diff", Icon: DiffIcon },
   explorer: { label: "Explorer", Icon: FoldersIcon },
+  map: { label: "Map", Icon: WorkflowIcon },
   file: { label: "File", Icon: FileIcon },
   terminal: { label: "Terminal", Icon: TerminalIcon },
   sidechat: { label: "Side chats", Icon: MessageCircleIcon },
@@ -82,6 +84,7 @@ const RIGHT_DOCK_LAUNCHER_ORDER: readonly RightDockPaneKind[] = [
   "terminal",
   "browser",
   "explorer",
+  "map",
   "sidechat",
   "device",
   "git",
@@ -90,6 +93,7 @@ const RIGHT_DOCK_LAUNCHER_ORDER: readonly RightDockPaneKind[] = [
 const RIGHT_DOCK_LAUNCHER_LABELS: Partial<Record<RightDockPaneKind, string>> = {
   diff: "Review",
   explorer: "Files",
+  map: "Map",
   sidechat: "Side chats",
   git: "Source control",
 };
@@ -113,6 +117,9 @@ export function resolveRightDockLauncherItems(input: {
       return [];
     }
     if (kind === "explorer" && !input.hasWorkspace) {
+      return [];
+    }
+    if (kind === "map" && !input.hasWorkspace) {
       return [];
     }
     if (kind === "device" && input.hasDeviceSupport !== true) {

@@ -206,6 +206,13 @@ export default defineConfig({
   ],
   optimizeDeps: {
     include: [
+      // Three.js stack for the Map pane: without prebundling, the `drei` barrel
+      // pulls thousands of unbundled ESM modules (three-stdlib, mediapipe,
+      // hls.js...) straight into the dev renderer the moment Map is opened.
+      "three",
+      "@react-three/fiber",
+      "@react-three/drei",
+      "troika-three-text",
       "@pierre/diffs",
       "@pierre/diffs/react",
       "@pierre/diffs/worker/worker.js",

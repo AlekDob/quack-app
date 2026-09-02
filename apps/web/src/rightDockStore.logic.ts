@@ -14,6 +14,7 @@ export const RIGHT_DOCK_PANE_KINDS = [
   "device",
   "diff",
   "explorer",
+  "map",
   "file",
   "terminal",
   "sidechat",

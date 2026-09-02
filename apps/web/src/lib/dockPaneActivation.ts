@@ -88,9 +88,12 @@ export function scheduleDeferredDockPaneHydration(input: {
 
 // The device pane holds a WebCodecs decoder and a frame socket, so a restored
 // tab must stay in preview until the user actually looks at it.
+// Map pulls Three.js / R3F into a lazy chunk — keep restored Map tabs in preview
+// for the same first-paint window so app boot does not pay for WebGL.
 const DEFERRED_RUNTIME_PANE_KINDS: ReadonlySet<RightDockPaneKind> = new Set<RightDockPaneKind>([
   "browser",
   "device",
+  "map",
   "sidechat",
   "terminal",
 ]);

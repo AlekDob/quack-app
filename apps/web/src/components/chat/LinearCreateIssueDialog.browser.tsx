@@ -175,9 +175,7 @@ describe("LinearCreateIssueDialog cycles", () => {
       await page.getByLabelText("Linear team").click();
       await page.getByRole("option", { name: "OPS — Operations", exact: true }).click();
 
-      await expect
-        .element(page.getByLabelText("Linear cycle"))
-        .toHaveTextContent("Operations now");
+      await expect.element(page.getByLabelText("Linear cycle")).toHaveTextContent("Operations now");
       await page.getByText("Create", { exact: true }).click();
       await vi.waitFor(() =>
         expect(createIssue).toHaveBeenCalledWith(

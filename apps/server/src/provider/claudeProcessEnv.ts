@@ -136,6 +136,10 @@ export function buildClaudeProcessEnv(input?: {
   if (input?.homeDir) {
     env.HOME = input.homeDir;
   }
+  // Tool search defers native tools (TodoWrite, WebSearch, ...) behind ToolSearch,
+  // so sessions keep failing to load them. auto:100 = standard mode, every tool
+  // stays in the prompt. An explicit env value still wins.
+  env.ENABLE_TOOL_SEARCH ??= "auto:100";
   const credentialInput = input?.homeDir ? { env, homeDir: input.homeDir } : { env };
   const hasLocalClaudeAuth =
     input?.hasClaudeCliCredentials ?? hasUsableClaudeCliCredentials(credentialInput);

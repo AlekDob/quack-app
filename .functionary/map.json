@@ -1,0 +1,1000 @@
+{
+  "schemaVersion": 1,
+  "id": "quack-app",
+  "name": "Quack / Synara",
+  "repository": "github.com/AlekDob/quack-app",
+  "summary": "Desktop-first coding-agent workspace that connects a web client and Electron shell to a server-side orchestration runtime, provider adapters, persistence, and developer tooling.",
+  "generatedAt": "2026-08-21T00:00:00Z",
+  "nodes": [
+    {
+      "id": "client-experience",
+      "label": "Client Experience",
+      "kind": "scope",
+      "archetype": "district",
+      "description": "User-facing web application and product delivery surface.",
+      "sourceRefs": [
+        {
+          "path": "apps/web/package.json",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/web/package.json",
+          "note": "Web package manifest."
+        },
+        {
+          "path": "apps/marketing/package.json",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/marketing/package.json",
+          "note": "Marketing package manifest."
+        }
+      ],
+      "metrics": {},
+      "tags": ["client", "product"],
+      "display": {
+        "color": "#4F46E5",
+        "flowLayer": 0,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "runtime-orchestration",
+      "label": "Runtime & Orchestration",
+      "kind": "scope",
+      "archetype": "district",
+      "description": "Server boundary, orchestration engine, provider runtime, and operational services.",
+      "sourceRefs": [
+        {
+          "path": "apps/server/package.json",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/package.json",
+          "note": "Server package manifest."
+        },
+        {
+          "path": "docs/repo-scan-2026-04-16/01-architecture-and-boundaries.md",
+          "line": 3,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/docs/repo-scan-2026-04-16/01-architecture-and-boundaries.md",
+          "note": "Repository architecture summary."
+        }
+      ],
+      "metrics": {},
+      "tags": ["server", "orchestration", "runtime"],
+      "display": {
+        "color": "#0F766E",
+        "flowLayer": 1,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "platform-foundation",
+      "label": "Platform Foundation",
+      "kind": "scope",
+      "archetype": "district",
+      "description": "Desktop host, shared runtime utilities, protocol contracts, and persistent operational resources.",
+      "sourceRefs": [
+        {
+          "path": "apps/desktop/package.json",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/desktop/package.json",
+          "note": "Electron desktop manifest."
+        },
+        {
+          "path": "packages/contracts/package.json",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/packages/contracts/package.json",
+          "note": "Shared contract package."
+        },
+        {
+          "path": "packages/shared/package.json",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/packages/shared/package.json",
+          "note": "Shared runtime package."
+        }
+      ],
+      "metrics": {},
+      "tags": ["platform", "shared"],
+      "display": {
+        "color": "#B45309",
+        "flowLayer": 2,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "web-app",
+      "label": "Web App",
+      "kind": "deployable",
+      "archetype": "building",
+      "parentId": "client-experience",
+      "description": "Vite/React client for navigation, conversation rendering, project workspaces, and orchestration state.",
+      "sourceRefs": [
+        {
+          "path": "apps/web/package.json",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/web/package.json",
+          "note": "Vite/React deployable."
+        },
+        {
+          "path": "apps/web/src/store.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/web/src/store.ts",
+          "note": "Public client state facade."
+        },
+        {
+          "path": "apps/web/src/bootstrap.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/web/src/bootstrap.ts",
+          "note": "Client bootstrap boundary."
+        }
+      ],
+      "metrics": {
+        "rooms": 3
+      },
+      "tags": ["vite", "react", "websocket-client"],
+      "display": {
+        "flowLayer": 0,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "web-boundary",
+      "label": "Navigation and session boundary",
+      "kind": "module",
+      "archetype": "room",
+      "parentId": "web-app",
+      "description": "Bootstraps the client, restores routes, and establishes the application session boundary.",
+      "sourceRefs": [
+        {
+          "path": "apps/web/src/bootstrap.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/web/src/bootstrap.ts",
+          "note": "Client bootstrap."
+        },
+        {
+          "path": "apps/web/src/appNavigation.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/web/src/appNavigation.ts",
+          "note": "Navigation model."
+        }
+      ],
+      "metrics": {},
+      "tags": ["boundary"],
+      "display": {
+        "flowLayer": 0,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "web-orchestration-state",
+      "label": "Orchestration state projection",
+      "kind": "module",
+      "archetype": "room",
+      "parentId": "web-app",
+      "description": "Normalizes server snapshots and domain events into client state and selectors.",
+      "sourceRefs": [
+        {
+          "path": "apps/web/src/store.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/web/src/store.ts",
+          "note": "State facade."
+        },
+        {
+          "path": "apps/web/src/storeProjection.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/web/src/storeProjection.ts",
+          "note": "Projection transitions."
+        }
+      ],
+      "metrics": {},
+      "tags": ["state", "projection"],
+      "display": {
+        "flowLayer": 1,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "web-workspace-ui",
+      "label": "Conversation and workspace UI",
+      "kind": "module",
+      "archetype": "room",
+      "parentId": "web-app",
+      "description": "Renders chat, diffs, terminals, browser panels, projects, and provider controls.",
+      "sourceRefs": [
+        {
+          "path": "apps/web/src/components/ChatView.tsx",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/web/src/components/ChatView.tsx",
+          "note": "Conversation surface."
+        },
+        {
+          "path": "apps/web/src/components/EditorWorkspaceView.tsx",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/web/src/components/EditorWorkspaceView.tsx",
+          "note": "Workspace surface."
+        }
+      ],
+      "metrics": {},
+      "tags": ["ui", "workspace"],
+      "display": {
+        "flowLayer": 2,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "marketing-site",
+      "label": "Marketing Site",
+      "kind": "deployable",
+      "archetype": "building",
+      "parentId": "client-experience",
+      "description": "Astro static product site and download surface.",
+      "sourceRefs": [
+        {
+          "path": "apps/marketing/package.json",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/marketing/package.json",
+          "note": "Astro deployable."
+        },
+        {
+          "path": "apps/marketing/src/pages/index.astro",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/marketing/src/pages/index.astro",
+          "note": "Product landing page."
+        }
+      ],
+      "metrics": {
+        "rooms": 2,
+        "routes": 2
+      },
+      "tags": ["astro", "static-site"],
+      "display": {
+        "flowLayer": 0,
+        "flowOrder": 1
+      }
+    },
+    {
+      "id": "marketing-pages",
+      "label": "Product and download pages",
+      "kind": "module",
+      "archetype": "room",
+      "parentId": "marketing-site",
+      "description": "Publishes product messaging and platform download routes.",
+      "sourceRefs": [
+        {
+          "path": "apps/marketing/src/pages/index.astro",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/marketing/src/pages/index.astro",
+          "note": "Landing page."
+        },
+        {
+          "path": "apps/marketing/src/pages/download.astro",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/marketing/src/pages/download.astro",
+          "note": "Download page."
+        }
+      ],
+      "metrics": {
+        "routes": 2
+      },
+      "tags": ["content", "delivery"],
+      "display": {
+        "flowLayer": 0,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "release-catalog",
+      "label": "Release catalog",
+      "kind": "module",
+      "archetype": "room",
+      "parentId": "marketing-site",
+      "description": "Resolves release metadata used by download presentation.",
+      "sourceRefs": [
+        {
+          "path": "apps/marketing/src/lib/releases.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/marketing/src/lib/releases.ts",
+          "note": "Release metadata helper."
+        }
+      ],
+      "metrics": {},
+      "tags": ["releases"],
+      "display": {
+        "flowLayer": 1,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "server-runtime",
+      "label": "Synara Server",
+      "kind": "deployable",
+      "archetype": "building",
+      "parentId": "runtime-orchestration",
+      "description": "Node/Bun CLI server that exposes the WebSocket API and assembles live Effect services.",
+      "sourceRefs": [
+        {
+          "path": "apps/server/package.json",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/package.json",
+          "note": "Server manifest and CLI entry."
+        },
+        {
+          "path": "apps/server/src/index.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/src/index.ts",
+          "note": "Runtime layer assembly and process entry."
+        }
+      ],
+      "metrics": {
+        "rooms": 4
+      },
+      "tags": ["node", "bun", "effect", "cli"],
+      "display": {
+        "flowLayer": 1,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "server-transport",
+      "label": "WebSocket and RPC transport",
+      "kind": "module",
+      "archetype": "room",
+      "parentId": "server-runtime",
+      "description": "Authenticates connections, decodes contract messages, routes requests, and pushes events to clients.",
+      "sourceRefs": [
+        {
+          "path": "apps/server/src/server",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/tree/main/apps/server/src/server",
+          "note": "Server transport area."
+        },
+        {
+          "path": "packages/contracts/src/ws.ts",
+          "line": 161,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/packages/contracts/src/ws.ts",
+          "note": "WebSocket method and message contracts."
+        }
+      ],
+      "metrics": {},
+      "tags": ["websocket", "rpc", "auth"],
+      "display": {
+        "flowLayer": 1,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "server-service-registry",
+      "label": "Effect service assembly",
+      "kind": "module",
+      "archetype": "room",
+      "parentId": "server-runtime",
+      "description": "Composes configuration, server, networking, filesystem, and provider layers into the running process.",
+      "sourceRefs": [
+        {
+          "path": "apps/server/src/index.ts",
+          "line": 10,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/src/index.ts",
+          "note": "RuntimeLayer composition."
+        },
+        {
+          "path": "apps/server/src/effectServer.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/src/effectServer.ts",
+          "note": "Server live layer."
+        }
+      ],
+      "metrics": {},
+      "tags": ["effect", "runtime"],
+      "display": {
+        "flowLayer": 2,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "orchestration-engine",
+      "label": "Orchestration engine",
+      "kind": "module",
+      "archetype": "room",
+      "parentId": "server-runtime",
+      "description": "Admits commands, drives turn lifecycle, projects state, checkpoints runtime activity, and coordinates reactors.",
+      "sourceRefs": [
+        {
+          "path": "apps/server/src/orchestration/Layers/OrchestrationEngine.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/src/orchestration/Layers/OrchestrationEngine.ts",
+          "note": "Engine layer."
+        },
+        {
+          "path": "apps/server/src/orchestration/decider.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/src/orchestration/decider.ts",
+          "note": "Command decision logic."
+        }
+      ],
+      "metrics": {},
+      "tags": ["commands", "turns", "events"],
+      "display": {
+        "flowLayer": 3,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "provider-runtime",
+      "label": "Provider runtime adapters",
+      "kind": "module",
+      "archetype": "room",
+      "parentId": "server-runtime",
+      "description": "Discovers providers, manages sessions, adapts provider protocols, and reconciles runtime health.",
+      "sourceRefs": [
+        {
+          "path": "apps/server/src/provider/Layers/ProviderService.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/src/provider/Layers/ProviderService.ts",
+          "note": "Provider service layer."
+        },
+        {
+          "path": "apps/server/src/provider/Layers/ProviderAdapterRegistry.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/src/provider/Layers/ProviderAdapterRegistry.ts",
+          "note": "Adapter registry."
+        }
+      ],
+      "metrics": {},
+      "tags": ["providers", "sessions", "adapters"],
+      "display": {
+        "flowLayer": 3,
+        "flowOrder": 1
+      }
+    },
+    {
+      "id": "desktop-shell",
+      "label": "Desktop Shell",
+      "kind": "deployable",
+      "archetype": "building",
+      "parentId": "platform-foundation",
+      "description": "Electron application that hosts the client, supervises the local backend, and provides native IPC and browser capabilities.",
+      "sourceRefs": [
+        {
+          "path": "apps/desktop/package.json",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/desktop/package.json",
+          "note": "Electron package manifest."
+        },
+        {
+          "path": "apps/desktop/src/main.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/desktop/src/main.ts",
+          "note": "Desktop main process."
+        }
+      ],
+      "metrics": {
+        "rooms": 3
+      },
+      "tags": ["electron", "native"],
+      "display": {
+        "flowLayer": 0,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "desktop-process-supervision",
+      "label": "Backend process supervision",
+      "kind": "module",
+      "archetype": "room",
+      "parentId": "desktop-shell",
+      "description": "Starts, probes, supervises, and shuts down the local server process.",
+      "sourceRefs": [
+        {
+          "path": "apps/desktop/src/backendReadiness.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/desktop/src/backendReadiness.ts",
+          "note": "Backend readiness."
+        },
+        {
+          "path": "apps/desktop/src/backendShutdown.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/desktop/src/backendShutdown.ts",
+          "note": "Backend shutdown."
+        }
+      ],
+      "metrics": {},
+      "tags": ["lifecycle", "supervision"],
+      "display": {
+        "flowLayer": 1,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "desktop-native-integration",
+      "label": "Native window and IPC integration",
+      "kind": "module",
+      "archetype": "room",
+      "parentId": "desktop-shell",
+      "description": "Bridges renderer requests to Electron windows, menus, preload APIs, and native services.",
+      "sourceRefs": [
+        {
+          "path": "apps/desktop/src/preload.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/desktop/src/preload.ts",
+          "note": "Preload bridge."
+        },
+        {
+          "path": "apps/desktop/src/ipcChannels.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/desktop/src/ipcChannels.ts",
+          "note": "IPC channel definitions."
+        }
+      ],
+      "metrics": {},
+      "tags": ["ipc", "electron"],
+      "display": {
+        "flowLayer": 1,
+        "flowOrder": 1
+      }
+    },
+    {
+      "id": "desktop-browser-device",
+      "label": "Browser and device services",
+      "kind": "module",
+      "archetype": "room",
+      "parentId": "desktop-shell",
+      "description": "Hosts browser panels, annotations, local device helpers, and native browser-use pipes.",
+      "sourceRefs": [
+        {
+          "path": "apps/desktop/src/browserManager.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/desktop/src/browserManager.ts",
+          "note": "Browser manager."
+        },
+        {
+          "path": "apps/desktop/src/browserUsePipeServer.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/desktop/src/browserUsePipeServer.ts",
+          "note": "Browser-use pipe server."
+        }
+      ],
+      "metrics": {},
+      "tags": ["browser", "device"],
+      "display": {
+        "flowLayer": 2,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "contracts",
+      "label": "Protocol contracts",
+      "kind": "module",
+      "archetype": "room",
+      "parentId": "platform-foundation",
+      "description": "Schema-only shared definitions for WebSocket, orchestration, provider, model, and server messages.",
+      "sourceRefs": [
+        {
+          "path": "packages/contracts/src/ws.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/packages/contracts/src/ws.ts",
+          "note": "WebSocket schemas."
+        },
+        {
+          "path": "packages/contracts/src/orchestration.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/packages/contracts/src/orchestration.ts",
+          "note": "Orchestration schemas."
+        }
+      ],
+      "metrics": {},
+      "tags": ["schemas", "protocol"],
+      "display": {
+        "flowLayer": 2,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "shared-runtime",
+      "label": "Shared runtime utilities",
+      "kind": "module",
+      "archetype": "room",
+      "parentId": "platform-foundation",
+      "description": "Cross-runtime helpers for Git, shell, networking, threads, workspaces, and environment state.",
+      "sourceRefs": [
+        {
+          "path": "packages/shared/src/git.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/packages/shared/src/git.ts",
+          "note": "Git helper."
+        },
+        {
+          "path": "packages/shared/src/Net.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/packages/shared/src/Net.ts",
+          "note": "Networking helper."
+        },
+        {
+          "path": "packages/shared/src/threadWorkspace.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/packages/shared/src/threadWorkspace.ts",
+          "note": "Workspace helper."
+        }
+      ],
+      "metrics": {},
+      "tags": ["shared", "git", "workspace"],
+      "display": {
+        "flowLayer": 3,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "state-database",
+      "label": "Local orchestration state",
+      "kind": "infra",
+      "archetype": "database",
+      "parentId": "platform-foundation",
+      "description": "SQLite-backed state and event projections used by the server runtime.",
+      "sourceRefs": [
+        {
+          "path": "apps/server/src/persistence",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/tree/main/apps/server/src/persistence",
+          "note": "Persistence services and migrations."
+        }
+      ],
+      "metrics": {},
+      "tags": ["sqlite", "persistence", "events"],
+      "display": {
+        "flowLayer": 4,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "workspace-storage",
+      "label": "Project and thread workspace",
+      "kind": "infra",
+      "archetype": "storage",
+      "parentId": "platform-foundation",
+      "description": "Local filesystem workspace for projects, thread artifacts, patches, exports, and previews.",
+      "sourceRefs": [
+        {
+          "path": "packages/shared/src/synaraHome.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/packages/shared/src/synaraHome.ts",
+          "note": "Local application home."
+        },
+        {
+          "path": "packages/shared/src/threadWorkspace.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/packages/shared/src/threadWorkspace.ts",
+          "note": "Thread workspace paths."
+        }
+      ],
+      "metrics": {},
+      "tags": ["filesystem", "artifacts"],
+      "display": {
+        "flowLayer": 4,
+        "flowOrder": 1
+      }
+    },
+    {
+      "id": "agent-providers",
+      "label": "Coding agent providers",
+      "kind": "external",
+      "archetype": "cloud",
+      "parentId": "runtime-orchestration",
+      "description": "External agent runtimes selected through provider adapters, including Codex and other supported ACP or CLI providers.",
+      "sourceRefs": [
+        {
+          "path": "apps/server/src/provider/Services/ProviderAdapter.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/src/provider/Services/ProviderAdapter.ts",
+          "note": "Provider abstraction."
+        },
+        {
+          "path": "packages/contracts/src/orchestration.ts",
+          "line": 67,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/packages/contracts/src/orchestration.ts",
+          "note": "Provider kinds."
+        }
+      ],
+      "metrics": {},
+      "tags": ["external", "agents"],
+      "display": {
+        "flowLayer": 4,
+        "flowOrder": 0
+      }
+    },
+    {
+      "id": "github-services",
+      "label": "GitHub and repository services",
+      "kind": "external",
+      "archetype": "cloud",
+      "parentId": "runtime-orchestration",
+      "description": "External GitHub APIs and command-line services used for repository identity, avatars, pull requests, and Git workflows.",
+      "sourceRefs": [
+        {
+          "path": "packages/shared/src/githubRepository.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/packages/shared/src/githubRepository.ts",
+          "note": "GitHub repository integration."
+        },
+        {
+          "path": "apps/server/src/git/Services/GitHubCli.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/src/git/Services/GitHubCli.ts",
+          "note": "GitHub CLI integration."
+        }
+      ],
+      "metrics": {},
+      "tags": ["external", "github", "git"],
+      "display": {
+        "flowLayer": 4,
+        "flowOrder": 1
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "web-to-contracts",
+      "from": "web-app",
+      "to": "contracts",
+      "kind": "depends_on",
+      "evidence": "declared",
+      "label": "shared schemas",
+      "sourceRefs": [
+        {
+          "path": "apps/web/package.json",
+          "line": 18,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/web/package.json",
+          "note": "Workspace dependency."
+        }
+      ]
+    },
+    {
+      "id": "web-to-server",
+      "from": "web-app",
+      "to": "server-runtime",
+      "kind": "data_flow",
+      "evidence": "declared",
+      "label": "WebSocket RPC and domain events",
+      "sourceRefs": [
+        {
+          "path": "packages/contracts/src/ws.ts",
+          "line": 161,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/packages/contracts/src/ws.ts",
+          "note": "WebSocket protocol."
+        }
+      ]
+    },
+    {
+      "id": "marketing-to-releases",
+      "from": "marketing-pages",
+      "to": "release-catalog",
+      "kind": "calls",
+      "evidence": "declared",
+      "label": "release metadata",
+      "sourceRefs": [
+        {
+          "path": "apps/marketing/src/lib/releases.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/marketing/src/lib/releases.ts",
+          "note": "Release helper."
+        }
+      ]
+    },
+    {
+      "id": "desktop-hosts-web",
+      "from": "desktop-shell",
+      "to": "web-app",
+      "kind": "deploys",
+      "evidence": "inferred",
+      "confidence": 0.88,
+      "label": "Electron renderer",
+      "sourceRefs": [
+        {
+          "path": "apps/desktop/src/main.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/desktop/src/main.ts",
+          "note": "Desktop main process hosts renderer."
+        }
+      ]
+    },
+    {
+      "id": "desktop-starts-server",
+      "from": "desktop-shell",
+      "to": "server-runtime",
+      "kind": "deploys",
+      "evidence": "declared",
+      "label": "local backend process",
+      "sourceRefs": [
+        {
+          "path": "apps/desktop/src/backendReadiness.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/desktop/src/backendReadiness.ts",
+          "note": "Backend readiness and supervision."
+        }
+      ]
+    },
+    {
+      "id": "desktop-to-shared",
+      "from": "desktop-shell",
+      "to": "shared-runtime",
+      "kind": "depends_on",
+      "evidence": "declared",
+      "label": "native runtime helpers",
+      "sourceRefs": [
+        {
+          "path": "apps/desktop/package.json",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/desktop/package.json",
+          "note": "Workspace dependency."
+        }
+      ]
+    },
+    {
+      "id": "server-to-contracts",
+      "from": "server-runtime",
+      "to": "contracts",
+      "kind": "depends_on",
+      "evidence": "declared",
+      "label": "protocol schemas",
+      "sourceRefs": [
+        {
+          "path": "apps/server/package.json",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/package.json",
+          "note": "Workspace dependency."
+        }
+      ]
+    },
+    {
+      "id": "server-to-shared",
+      "from": "server-runtime",
+      "to": "shared-runtime",
+      "kind": "depends_on",
+      "evidence": "declared",
+      "label": "network, Git, workspace helpers",
+      "sourceRefs": [
+        {
+          "path": "apps/server/src/index.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/src/index.ts",
+          "note": "NetService dependency."
+        }
+      ]
+    },
+    {
+      "id": "transport-to-orchestration",
+      "from": "server-transport",
+      "to": "orchestration-engine",
+      "kind": "calls",
+      "evidence": "inferred",
+      "confidence": 0.91,
+      "label": "commands and subscriptions",
+      "sourceRefs": [
+        {
+          "path": "packages/contracts/src/orchestration.ts",
+          "line": 34,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/packages/contracts/src/orchestration.ts",
+          "note": "Orchestration RPC methods."
+        }
+      ]
+    },
+    {
+      "id": "orchestration-to-provider",
+      "from": "orchestration-engine",
+      "to": "provider-runtime",
+      "kind": "calls",
+      "evidence": "declared",
+      "label": "provider commands and runtime ingestion",
+      "sourceRefs": [
+        {
+          "path": "apps/server/src/orchestration/Layers/ProviderCommandReactor.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/src/orchestration/Layers/ProviderCommandReactor.ts",
+          "note": "Provider command reactor."
+        },
+        {
+          "path": "apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts",
+          "note": "Provider runtime ingestion."
+        }
+      ]
+    },
+    {
+      "id": "orchestration-to-state",
+      "from": "orchestration-engine",
+      "to": "state-database",
+      "kind": "data_flow",
+      "evidence": "declared",
+      "label": "events and projections",
+      "sourceRefs": [
+        {
+          "path": "apps/server/src/persistence",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/tree/main/apps/server/src/persistence",
+          "note": "Persistence subsystem."
+        }
+      ]
+    },
+    {
+      "id": "provider-to-state",
+      "from": "provider-runtime",
+      "to": "state-database",
+      "kind": "data_flow",
+      "evidence": "inferred",
+      "confidence": 0.86,
+      "label": "runtime receipts and projections",
+      "sourceRefs": [
+        {
+          "path": "apps/server/src/orchestration/Layers/RuntimeReceiptBus.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/src/orchestration/Layers/RuntimeReceiptBus.ts",
+          "note": "Runtime receipt path."
+        }
+      ]
+    },
+    {
+      "id": "orchestration-to-workspace",
+      "from": "orchestration-engine",
+      "to": "workspace-storage",
+      "kind": "data_flow",
+      "evidence": "declared",
+      "label": "thread and project artifacts",
+      "sourceRefs": [
+        {
+          "path": "packages/shared/src/threadWorkspace.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/packages/shared/src/threadWorkspace.ts",
+          "note": "Workspace storage helper."
+        }
+      ]
+    },
+    {
+      "id": "provider-to-agents",
+      "from": "provider-runtime",
+      "to": "agent-providers",
+      "kind": "data_flow",
+      "evidence": "declared",
+      "label": "provider process/session protocol",
+      "sourceRefs": [
+        {
+          "path": "apps/server/src/provider/Services/ProviderAdapter.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/src/provider/Services/ProviderAdapter.ts",
+          "note": "Provider adapter boundary."
+        }
+      ]
+    },
+    {
+      "id": "shared-to-github",
+      "from": "shared-runtime",
+      "to": "github-services",
+      "kind": "calls",
+      "evidence": "declared",
+      "label": "repository and GitHub metadata",
+      "sourceRefs": [
+        {
+          "path": "packages/shared/src/githubRepository.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/packages/shared/src/githubRepository.ts",
+          "note": "GitHub integration."
+        }
+      ]
+    },
+    {
+      "id": "server-to-github",
+      "from": "server-runtime",
+      "to": "github-services",
+      "kind": "calls",
+      "evidence": "declared",
+      "label": "GitHub CLI and pull requests",
+      "sourceRefs": [
+        {
+          "path": "apps/server/src/git/Services/GitHubCli.ts",
+          "line": 1,
+          "url": "https://github.com/AlekDob/quack-app/blob/main/apps/server/src/git/Services/GitHubCli.ts",
+          "note": "GitHub CLI service."
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    "No existing .functionary/map.json or legacy .repo-city/map.json was found, so stable IDs were created from current architectural boundaries.",
+    "The repository supports multiple provider adapters and external runtimes; the external provider node intentionally aggregates interchangeable providers.",
+    "Static inspection did not provide runtime telemetry, so no relationships are marked observed.",
+    "The exact WebSocket implementation file is distributed across the server runtime areas; transport is represented as a semantic module rather than a single-file boundary."
+  ]
+}

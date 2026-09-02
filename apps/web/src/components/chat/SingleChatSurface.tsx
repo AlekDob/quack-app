@@ -126,6 +126,11 @@ const DockExplorerPane = lazy(() =>
     default: module.DockExplorerPane,
   })),
 );
+const FunctionaryMapPane = lazy(() =>
+  import("./FunctionaryMapPane").then((module) => ({
+    default: module.FunctionaryMapPane,
+  })),
+);
 const DockFilePane = lazy(() =>
   import("./DockFilePane").then((module) => ({
     default: module.DockFilePane,
@@ -870,6 +875,22 @@ export function SingleChatSurface(props: {
               onReferenceInChat={handleReferenceInChat}
               onAskWhyInChat={handleAskWhyInChat}
               onCommentInChat={handleCommentInChat}
+            />
+          </Suspense>
+        );
+      case "map":
+        // Deferred restore + collapsed dock: never pay for Three.js off-screen.
+        if (context.runtimeMode === "preview") {
+          return <PanelStateMessage>Map is sleeping. Restoring shortly.</PanelStateMessage>;
+        }
+        if (!context.isVisible) {
+          return null;
+        }
+        return (
+          <Suspense fallback={<PanelStateMessage>Loading map...</PanelStateMessage>}>
+            <FunctionaryMapPane
+              workspaceRoot={workspaceRoot}
+              onReferenceInChat={handleReferenceInChat}
             />
           </Suspense>
         );

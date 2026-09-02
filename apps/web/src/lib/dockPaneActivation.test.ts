@@ -13,10 +13,11 @@ import {
 } from "./dockPaneActivation";
 
 describe("dockPaneActivation", () => {
-  it("treats browser, sidechat, and terminal panes as deferred runtime panes", () => {
+  it("treats browser, sidechat, terminal, and map panes as deferred runtime panes", () => {
     expect(isDeferredRuntimePaneKind("browser")).toBe(true);
     expect(isDeferredRuntimePaneKind("sidechat")).toBe(true);
     expect(isDeferredRuntimePaneKind("terminal")).toBe(true);
+    expect(isDeferredRuntimePaneKind("map")).toBe(true);
     expect(isDeferredRuntimePaneKind("diff")).toBe(false);
     expect(isDeferredRuntimePaneKind("git")).toBe(false);
   });
@@ -36,6 +37,9 @@ describe("dockPaneActivation", () => {
     ).toBe("preview");
     expect(resolveDockPaneRuntimeMode({ kind: "browser", reason: "restore", hydrated: true })).toBe(
       "live",
+    );
+    expect(resolveDockPaneRuntimeMode({ kind: "map", reason: "restore", hydrated: false })).toBe(
+      "preview",
     );
   });
 

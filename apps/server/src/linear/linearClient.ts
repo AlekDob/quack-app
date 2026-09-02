@@ -236,9 +236,7 @@ export async function listLinearCreateOptions(
   return {
     workspace,
     teams: (teams ?? []).map((team) => {
-      const activeCycle = team.activeCycle
-        ? toCycle(team.activeCycle as RawCycle, true)
-        : null;
+      const activeCycle = team.activeCycle ? toCycle(team.activeCycle as RawCycle, true) : null;
       const futureCycles = (
         (team.futureCycles as { nodes?: ReadonlyArray<RawCycle> } | null)?.nodes ?? []
       ).flatMap((cycle) => {
