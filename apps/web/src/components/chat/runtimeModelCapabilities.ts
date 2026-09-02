@@ -80,7 +80,10 @@ export function getRuntimeAwareModelCapabilities(input: {
   const staticCapabilities = getModelCapabilities(input.provider, input.model);
   // Runtime discovery is authoritative when available; the static table is only a startup fallback.
   const supportsFastMode =
-    (input.provider === "codex" || input.provider === "cursor") && input.runtimeModel
+    (input.provider === "codex" ||
+      input.provider === "cursor" ||
+      input.provider === "claudeAgent") &&
+    input.runtimeModel
       ? input.runtimeModel.supportsFastMode === true
       : staticCapabilities.supportsFastMode;
   const supportsThinkingToggle =
@@ -103,6 +106,7 @@ export function getRuntimeAwareModelCapabilities(input: {
       input.provider !== "droid" &&
       input.provider !== "kilo" &&
       input.provider !== "opencode" &&
+      input.provider !== "claudeAgent" &&
       input.provider !== "pi") ||
     !runtimeEfforts ||
     runtimeEfforts.length === 0
@@ -133,6 +137,16 @@ export function getRuntimeAwareModelCapabilities(input: {
     };
   });
 
+  // Ultrathink/Ultracode are Quack-side modes (prompt prefix, CLI setting), so the
+  // CLI never lists them — keep the static ones the selected model still declares.
+  const quackOnlyModes =
+    input.provider === "claudeAgent"
+      ? staticCapabilities.reasoningEffortLevels.filter(
+          (effort) =>
+            effort.controlSource === "prompt-prefix" || effort.controlSource === "provider-setting",
+        )
+      : [];
+
   if (input.provider === "kilo" || input.provider === "opencode") {
     return {
       ...staticCapabilities,
@@ -149,6 +163,6 @@ export function getRuntimeAwareModelCapabilities(input: {
     supportsFastMode,
     supportsThinkingToggle,
     contextWindowOptions,
-    reasoningEffortLevels: runtimeOptions,
+    reasoningEffortLevels: [...runtimeOptions, ...quackOnlyModes],
   };
 }

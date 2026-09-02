@@ -794,11 +794,22 @@ function toPermissionMode(value: unknown): PermissionMode | undefined {
   }
 }
 
+// The CLI already reports each model's effort ladder and fast-mode support, so
+// carrying them through keeps a newly released Claude model fully usable without
+// a Quack release adding it to the static capability table.
 function mapClaudeModelInfo(model: ModelInfo): ProviderListModelsResult["models"][number] {
+  const effortLevels = model.supportsEffort === false ? [] : (model.supportedEffortLevels ?? []);
   return {
     slug: model.value,
     ...(model.resolvedModel ? { resolvedModel: model.resolvedModel } : {}),
     name: model.displayName,
+    ...(model.description?.trim() ? { description: model.description.trim() } : {}),
+    ...(effortLevels.length > 0
+      ? { supportedReasoningEfforts: effortLevels.map((value) => ({ value })) }
+      : {}),
+    ...(typeof model.supportsFastMode === "boolean"
+      ? { supportsFastMode: model.supportsFastMode }
+      : {}),
     ...(typeof model.supportsAutoMode === "boolean"
       ? { supportsAutoMode: model.supportsAutoMode }
       : {}),

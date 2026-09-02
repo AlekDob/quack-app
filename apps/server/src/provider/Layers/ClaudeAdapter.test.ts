@@ -4966,6 +4966,8 @@ await agent("Draft the spec", { label: "delta-agent", phase: "Two" });
             resolvedModel: string;
             displayName: string;
             description: string;
+            supportedEffortLevels: string[];
+            supportsFastMode: boolean;
             supportsAutoMode: boolean;
           }>
         >;
@@ -4978,6 +4980,8 @@ await agent("Draft the spec", { label: "delta-agent", phase: "Two" });
           resolvedModel: "claude-fable-5[1m]",
           displayName: "Fable",
           description: "Claude Fable 5",
+          supportedEffortLevels: ["low", "high", "max"],
+          supportsFastMode: false,
           supportsAutoMode: true,
         },
       ];
@@ -5009,6 +5013,9 @@ await agent("Draft the spec", { label: "delta-agent", phase: "Two" });
             slug: "claude-fable-5[1m]",
             resolvedModel: "claude-fable-5[1m]",
             name: "Fable",
+            description: "Claude Fable 5",
+            supportedReasoningEfforts: [{ value: "low" }, { value: "high" }, { value: "max" }],
+            supportsFastMode: false,
             supportsAutoMode: true,
           },
         ],

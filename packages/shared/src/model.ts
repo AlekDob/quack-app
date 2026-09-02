@@ -440,6 +440,14 @@ export function getModelCapabilities(
     // provider ladder even before runtime discovery has returned their descriptor.
     return MODEL_CAPABILITIES_INDEX.grok["grok-build"] ?? EMPTY_MODEL_CAPABILITIES;
   }
+  if (provider === "claudeAgent" && slug?.startsWith("claude-")) {
+    // A first-party Claude model released after this build still needs the shared
+    // Claude controls (auto-compact window, ultracode). Its effort ladder and
+    // fast-mode support come from runtime discovery in
+    // getRuntimeAwareModelCapabilities. User-defined slugs (e.g. "claude/my-model")
+    // deliberately stay empty so nothing is forced onto an unknown runtime.
+    return MODEL_CAPABILITIES_INDEX.claudeAgent["claude-opus-5"] ?? EMPTY_MODEL_CAPABILITIES;
+  }
   return EMPTY_MODEL_CAPABILITIES;
 }
 
