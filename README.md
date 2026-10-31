@@ -51,13 +51,7 @@ Quack is the workspace layer on your machine. There is no Quack cloud holding yo
 
 The provider you pick still receives what a session needs — prompts, file snippets, diffs, terminal output, tool results. That traffic goes straight to that provider, not through anything we host.
 
-Telemetry is off. Nothing is sent anywhere unless you turn it on and point it at your own PostHog project:
-
-```sh
-SYNARA_TELEMETRY_ENABLED=true SYNARA_POSTHOG_KEY=phc_your_own_key quack
-```
-
-Without both variables the analytics layer stays silent.
+Quack has no telemetry. It sends no analytics or usage data anywhere.
 
 ## Status
 
