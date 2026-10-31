@@ -1,6 +1,6 @@
 ---
 name: quack-release
-description: Build, sign, notarize and publish a Quack desktop release (macOS DMG + updater feed) to the AlekDob/quack-releases repo. Use whenever the user asks to cut a release, publish a version, ship a build, upload a DMG, or says /release. Also use when they ask why a published build has no telemetry or why the auto-updater does not see a new version — both are release-step mistakes this skill prevents.
+description: Build, sign, notarize and publish a Quack desktop release (macOS DMG + updater feed) to the AlekDob/quack-releases repo. Use whenever the user asks to cut a release, publish a version, ship a build, upload a DMG, or says /release. Also use when they ask why the auto-updater does not see a new version — a release-step mistake this skill prevents.
 activationKeywords:
   - release
   - publish release
@@ -31,26 +31,12 @@ it and they must match. If the user wants a version bump, use the
 `bump-version` skill first — it also writes the "What's new" entry that the app
 shows after an update. Skipping it means users update and see nothing changed.
 
-**PostHog key.** The analytics key is baked into the bundle at build time by
-`apps/desktop/tsdown.config.mts`. Nothing reads it at runtime, because a
-shipped desktop app has no env vars. So:
-
-```bash
-export SYNARA_POSTHOG_KEY="phc_..."   # from the SYNARA_POSTHOG_KEY repo secret
-```
-
-Forget this and the build still succeeds — telemetry is just silently dead, with
-no log line saying so. That is the single easiest way to ship a blind release.
-A fork building from source gets `""` and stays silent on purpose, so the flag
-is deliberately quiet; you have to remember it.
-
 **Checks.** `bun fmt`, `bun lint`, `bun typecheck` must pass. Run them once, as
 one pass, not repeatedly.
 
 ## Build
 
 ```bash
-export SYNARA_POSTHOG_KEY="phc_..."
 bun run dist:desktop:dmg:arm64:signed
 ```
 
